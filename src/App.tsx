@@ -13,6 +13,7 @@ import { useAuth } from './store/auth';
 import { useDownloads } from './store/downloads';
 import { usePlayer } from './store/player';
 import { useSettings } from './store/settings';
+import { setNativeSystemBars } from './lib/native';
 import { toast } from './store/toast';
 import { EmbyError } from './api/emby';
 
@@ -31,9 +32,12 @@ function useTheme() {
     const apply = () => {
       const bg = getComputedStyle(root).getPropertyValue('--bg').trim();
       document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+      // Android : barre d'état et barre de navigation assorties au thème
+      const dark = theme === 'dark' || (theme === 'auto' && mq.matches);
+      setNativeSystemBars(bg, dark);
     };
-    apply();
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    apply();
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
   }, [theme]);

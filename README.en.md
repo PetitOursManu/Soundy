@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.5.3** | Android: status bar and navigation bar match the chosen theme (light / dark / automatic), with readable icons. |
 | **1.5.2** | Mobile: the curved scrollbar no longer overlaps the tracks (space reserved to the right of the wheel). |
 | **1.5.1** | Logo: the "S" now stands on its own, with no block around it, in the header, login screen and Settings. |
 | **1.5.0** | Turntable arm moving across the record as the track plays. Curved scrollbar following the track wheel. Server: more tolerant `EMBY_URL` (`/emby` suffix detected, spaces / quotes ignored), `/api/health` diagnostics, precise error messages. Requests tab: the entered address is used immediately. |

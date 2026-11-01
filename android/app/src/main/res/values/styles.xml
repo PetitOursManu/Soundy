@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
@@ -13,6 +13,12 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Barres système aux couleurs de Soundy dès l'ouverture (l'appli les ajuste
+             ensuite selon le thème choisi dans les Réglages) -->
+        <item name="android:statusBarColor">@color/system_bar</item>
+        <item name="android:navigationBarColor">@color/system_bar</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="23">@bool/system_bar_light</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">@bool/system_bar_light</item>
     </style>
 
 

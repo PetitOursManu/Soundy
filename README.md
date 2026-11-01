@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.5.3** | Android : barre d'état et barre de navigation de la couleur du thème choisi (clair / sombre / automatique), icônes lisibles. |
 | **1.5.2** | Mobile : la barre de défilement courbe ne passe plus sur les titres (place réservée à droite de la roue). |
 | **1.5.1** | Logo : le « S » apparaît seul, sans bloc autour, dans l'en-tête, l'écran de connexion et les Réglages. |
 | **1.5.0** | Bras de la platine qui avance sur le vinyle au fil du titre. Barre de défilement courbe qui suit la roue des titres. Serveur : `EMBY_URL` plus tolérante (suffixe `/emby` détecté, espaces / guillemets ignorés), diagnostic `/api/health`, messages d'erreur précis. Onglet Demandes : l'adresse saisie est utilisée immédiatement. |

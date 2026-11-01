@@ -2,6 +2,7 @@ package fr.soundy.app;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.os.Build;
@@ -10,8 +11,11 @@ import android.os.Vibrator;
 import android.provider.Settings;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
+import android.view.Window;
 
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -111,6 +115,33 @@ public class SoundyAudioPlugin extends Plugin {
             ContextCompat.startForegroundService(ctx, new Intent(ctx, PlaybackService.class));
         }
         call.resolve();
+    }
+
+    /**
+     * Barres système (barre d'état en haut, barre de navigation en bas) de la
+     * couleur du thème choisi dans Soundy, avec des icônes lisibles :
+     * sombres sur fond clair, claires sur fond sombre.
+     */
+    @PluginMethod
+    public void setSystemBars(PluginCall call) {
+        final String hex = call.getString("color", "");
+        final boolean dark = Boolean.TRUE.equals(call.getBoolean("dark", false));
+        final int color;
+        try {
+            color = Color.parseColor(hex);
+        } catch (IllegalArgumentException e) {
+            call.reject("Couleur invalide : " + hex);
+            return;
+        }
+        getActivity().runOnUiThread(() -> {
+            Window window = getActivity().getWindow();
+            window.setStatusBarColor(color);
+            window.setNavigationBarColor(color);
+            WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
+            controller.setAppearanceLightStatusBars(!dark);
+            controller.setAppearanceLightNavigationBars(!dark);
+            call.resolve();
+        });
     }
 
     /**

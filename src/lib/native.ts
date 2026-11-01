@@ -24,6 +24,7 @@ interface SoundyAudioPlugin {
   openBluetoothSettings(): Promise<void>;
   updatePlayback(info: PlaybackInfo): Promise<void>;
   haptic(opts: { type: 'tick' | 'click' | 'heavy' }): Promise<void>;
+  setSystemBars(opts: { color: string; dark: boolean }): Promise<void>;
   addListener(event: 'mediaAction', cb: (e: { action: string }) => void): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -56,4 +57,9 @@ export function onNativeMediaAction(cb: (action: string) => void) {
 
 export function nativeHaptic(type: 'tick' | 'click' | 'heavy') {
   SoundyAudio.haptic({ type }).catch(() => {});
+}
+
+/** Barre d'état / barre de navigation Android de la couleur du thème Soundy. */
+export function setNativeSystemBars(color: string, dark: boolean) {
+  if (isNative()) SoundyAudio.setSystemBars({ color, dark }).catch(() => {});
 }

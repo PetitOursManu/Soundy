@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fond du thème clair de Soundy (--bg) : icônes sombres -->
+    <color name="system_bar">#E6EBF5</color>
+    <bool name="system_bar_light">true</bool>
+</resources>
