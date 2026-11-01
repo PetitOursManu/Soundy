@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Couleur de fond de l'écran de démarrage (fond clair Soundy) -->
-    <color name="splash_background">#E6EBF5</color>
+    <!-- Couleur de fond de l’écran de démarrage (bleu nuit du logo) -->
+    <color name="splash_background">#050A1F</color>
 </resources>

@@ -85,12 +85,24 @@
   box-sizing: border-box;
 }
 
-/* Aucun effet d'étirement / de rebond en bout de défilement, nulle part
-   (page, menus, lecteur, rangées horizontales) */
+/* Aucun effet d'étirement / de rebond en bout de défilement.
+   ⚠️ Ne PAS l'appliquer à tous les éléments (*) : les zones « overflow: hidden »
+   (pochettes rondes, textes tronqués…) bloqueraient alors le défilement de la
+   page quand le doigt commence dessus. Uniquement sur les vraies zones défilantes. */
 html,
-body,
-* {
+body {
   overscroll-behavior: none;
+}
+
+.sheet,
+.player,
+.welcome.form {
+  overscroll-behavior-y: none;
+}
+
+.chips,
+.h-scroll {
+  overscroll-behavior-x: none;
 }
 
 html,
@@ -2306,7 +2318,8 @@ input[type='search']::-webkit-search-decoration {
 .brand img {
   width: var(--brand-size);
   height: var(--brand-size);
-  filter: drop-shadow(0 6px 10px rgba(60, 80, 160, 0.25));
+  border-radius: 22%;
+  box-shadow: 4px 5px 12px var(--sh-dark), -3px -3px 9px var(--sh-light);
 }
 
 .brand span {
