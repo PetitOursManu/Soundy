@@ -44,19 +44,25 @@ export default function Requests() {
   const [mine, setMine] = useState<MusicRequest[] | null>(null);
   const [all, setAll] = useState<MusicRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   // Appli Android : l'adresse du serveur Soundy doit être renseignée (pas de « même origine »)
   const needsSetup = isNative() && !requestsUrl;
 
-  const refresh = useCallback(async () => {
-    if (!online || needsSetup) return;
+  // `override` : nouvelle adresse tout juste saisie (évite d'utiliser l'ancienne)
+  const refresh = useCallback(async (override?: RequestsApi) => {
+    const client = override ?? api;
+    if (!online || (needsSetup && !override)) return;
     setError(null);
+    setChecking(true);
     try {
-      const [m, a] = await Promise.all([api.list('mine'), session.isAdmin ? api.list('all') : Promise.resolve(null)]);
+      const [m, a] = await Promise.all([client.list('mine'), session.isAdmin ? client.list('all') : Promise.resolve(null)]);
       setMine(m);
       setAll(a);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setChecking(false);
     }
   }, [api, online, session.isAdmin, needsSetup]);
 
@@ -86,7 +92,12 @@ export default function Requests() {
         {!online ? (
           <Empty icon={<IconAlert />} title={t('common.offline')} text={t('requests.offlineText')} />
         ) : needsSetup || error ? (
-          <ServerSetup error={needsSetup ? null : error} onRetry={() => void refresh()} />
+          <ServerSetup
+            error={needsSetup ? null : error}
+            checking={checking}
+            onRetry={() => void refresh()}
+            onSaved={(base) => void refresh(new RequestsApi(base, session))}
+          />
         ) : tab === 'new' ? (
           <RequestForm
             api={api}
@@ -130,7 +141,17 @@ export default function Requests() {
 // ---------------------------------------------------------------------------
 // Adresse du serveur de demandes (appli Android / serveur injoignable)
 // ---------------------------------------------------------------------------
-function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+function ServerSetup({
+  error,
+  checking,
+  onRetry,
+  onSaved,
+}: {
+  error: string | null;
+  checking: boolean;
+  onRetry: () => void;
+  onSaved: (base: string) => void;
+}) {
   const current = useSettings((s) => s.requestsUrl);
   const update = useSettings((s) => s.update);
   const [url, setUrl] = useState(current);
@@ -150,7 +171,7 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
       if (!res.ok || data?.name !== 'soundy') throw new Error();
       update({ requestsUrl: base });
       toast(t('requests.serverSaved'), 'success');
-      onRetry();
+      onSaved(base); // recharge tout de suite avec la NOUVELLE adresse
     } catch {
       setMsg(t('requests.serverNotFound', { url: base }));
     } finally {
@@ -192,11 +213,17 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
           {testing ? <span className="loader" style={{ width: 18, height: 18 }} /> : t('common.save')}
         </button>
         {error && (
-          <button className="btn" type="button" onClick={onRetry}>
-            {t('common.retry')}
+          <button className="btn" type="button" onClick={onRetry} disabled={checking}>
+            {checking ? <span className="loader" style={{ width: 18, height: 18 }} /> : t('common.retry')}
           </button>
         )}
       </div>
+      {error && (
+        // Le serveur répond mais n'arrive pas à vérifier le compte auprès d'Emby
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 14 }}>
+          {t('requests.embyHint', { url: `${(current || window.location.origin).replace(/\/+$/, '')}/api/health` })}
+        </p>
+      )}
     </form>
   );
 }

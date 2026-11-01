@@ -47,6 +47,21 @@ const MAX_WIDTH = 540; // largeur maximale de la roue (px)
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+// Barre de défilement courbe : arc (courbe de Bézier) creusé vers la gauche, comme la roue
+const ARC = { x0: 54, y0: 8, cx: -6, cy: 150, x1: 54, y1: 292 };
+const ARC_PATH = `M ${ARC.x0} ${ARC.y0} Q ${ARC.cx} ${ARC.cy} ${ARC.x1} ${ARC.y1}`;
+function arcPoint(t: number) {
+  const u = 1 - t;
+  return [u * u * ARC.x0 + 2 * u * t * ARC.cx + t * t * ARC.x1, u * u * ARC.y0 + 2 * u * t * ARC.cy + t * t * ARC.y1];
+}
+/** Petit segment de l'arc centré sur la position t (0 → 1). */
+function arcSegment(t: number) {
+  const half = 0.045;
+  const a = clamp(t - half, 0, 1 - 2 * half);
+  const pts = [0, 0.25, 0.5, 0.75, 1].map((k) => arcPoint(a + k * 2 * half));
+  return 'M ' + pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join(' L ');
+}
+
 function isTyping(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
@@ -88,7 +103,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
   maxRef.current = max;
   const raf = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLElement>(null);
+  const thumbRef = useRef<SVGPathElement>(null);
   const nodes = useRef(new Map<number, ItemNodes>());
   const [geo, setGeo] = useState(() => geometry(window.innerWidth));
   const geoRef = useRef(geo);
@@ -123,7 +138,9 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     });
     if ((window as unknown as { __soundyDebug?: boolean }).__soundyDebug) (window as unknown as { __wheelPos: number }).__wheelPos = pos;
     if (thumbRef.current) {
-      thumbRef.current.style.top = `${(clamp(pos, 0, maxRef.current) / Math.max(1, countRef.current - 1)) * 100}%`;
+      // Curseur : petit segment posé sur la courbe, à la position de lecture
+      const t = clamp(pos, 0, maxRef.current) / Math.max(1, countRef.current - 1);
+      thumbRef.current.setAttribute('d', arcSegment(t));
     }
     const f = clamp(Math.round(pos), 0, maxRef.current);
     if (f !== focusRef.current) {
@@ -461,9 +478,18 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
       <div className="wheel-fade bottom" aria-hidden />
 
       {count > 1 && (
-        <div className="wheel-scroll" aria-hidden>
-          <i ref={thumbRef} />
-        </div>
+        <svg className="wheel-scroll-arc" viewBox="0 0 60 300" aria-hidden>
+          <defs>
+            <linearGradient id="wheel-thumb" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--accent)" />
+              <stop offset="1" stopColor="var(--accent-2)" />
+            </linearGradient>
+          </defs>
+          {/* Rainure en creux qui suit la courbure de la roue */}
+          <path className="groove-shadow" d={ARC_PATH} />
+          <path className="groove" d={ARC_PATH} />
+          <path ref={thumbRef} className="thumb" d={arcSegment(0)} stroke="url(#wheel-thumb)" />
+        </svg>
       )}
       <div className="wheel-counter" aria-live="polite">
         {focus + 1} / {count}

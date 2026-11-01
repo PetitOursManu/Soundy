@@ -1189,7 +1189,9 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .tonearm.on {
-  transform: rotate(4deg);
+  /* L'angle exact est calculé selon la progression (Player.tsx) ; transition plus
+     courte une fois posé pour suivre la lecture en douceur */
+  transition: transform 0.6s linear;
 }
 
 .tonearm .base {
@@ -2232,28 +2234,38 @@ input[type='search']::-webkit-search-decoration {
   box-shadow: var(--neu-accent);
 }
 
-.wheel-scroll {
+.wheel-scroll-arc {
   z-index: 3;
   position: absolute;
-  right: 10px;
-  top: 30%;
-  bottom: 30%;
-  width: 5px;
-  border-radius: 5px;
-  box-shadow: var(--neu-in-sm);
+  right: 4px;
+  top: 27%;
+  height: 46%;
+  aspect-ratio: 60 / 300;
   pointer-events: none;
-  opacity: 0.8;
+  overflow: visible;
 }
 
-.wheel-scroll i {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 5px;
-  height: 18px;
-  margin-top: -9px;
-  border-radius: 5px;
-  background: linear-gradient(var(--accent), var(--accent-2));
+.wheel-scroll-arc path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* Rainure neumorphique : ombre décalée + creux clair */
+.wheel-scroll-arc .groove-shadow {
+  stroke: var(--sh-dark);
+  stroke-width: 6;
+  opacity: 0.7;
+  transform: translate(0.8px, 0.8px);
+}
+
+.wheel-scroll-arc .groove {
+  stroke: var(--bg);
+  stroke-width: 3.6;
+}
+
+.wheel-scroll-arc .thumb {
+  stroke-width: 6;
+  filter: drop-shadow(0 1px 2px rgba(86, 98, 240, 0.45));
 }
 
 .wheel-counter {

@@ -26,12 +26,17 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
-const EMBY_URL = (process.env.EMBY_URL || '').replace(/\/+$/, '');
+// Adresse d'Emby nettoyée (espaces, guillemets, « / » final, « /web/index.html »)
+const EMBY_URL = (process.env.EMBY_URL || '')
+  .trim()
+  .replace(/^["']|["']$/g, '')
+  .replace(/\/web(\/index\.html)?\/?$/i, '')
+  .replace(/\/+$/, '');
 const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
 const DATA_FILE = path.join(DATA_DIR, 'requests.json');
 const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 const CORS_ORIGINS = (process.env.CORS_ORIGINS || '*').split(',').map((s) => s.trim()).filter(Boolean);
-const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
+const WEBHOOK_URL = (process.env.WEBHOOK_URL || '').trim().replace(/^["']|["']$/g, '');
 const EMBY_PROXY = /^(1|true|yes)$/i.test(process.env.EMBY_PROXY || '');
 const MAX_PENDING = Number(process.env.MAX_PENDING || 20);
 
@@ -102,13 +107,48 @@ function saveStore() {
 // ----------------------------------------------------------------------------
 const authCache = new Map(); // token → { user, expires }
 
+// ----------------------------------------------------------------------------
+// Adresse réelle d'Emby : comme l'application, on essaie aussi le suffixe /emby
+// ----------------------------------------------------------------------------
+let embyBase = null; // adresse qui répond (null = pas encore trouvée)
+let embyCheckedAt = 0;
+
+async function probeEmby(base) {
+  try {
+    const r = await fetch(`${base}/System/Info/Public`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return false;
+    const d = await r.json();
+    return !!(d && (d.Id || d.ServerName));
+  } catch {
+    return false;
+  }
+}
+
+async function resolveEmby(force = false) {
+  if (!EMBY_URL) return null;
+  if (embyBase && !force) return embyBase;
+  if (!force && Date.now() - embyCheckedAt < 15_000) return embyBase; // évite de marteler un serveur absent
+  embyCheckedAt = Date.now();
+  for (const candidate of [EMBY_URL, /\/emby$/i.test(EMBY_URL) ? null : `${EMBY_URL}/emby`]) {
+    if (candidate && (await probeEmby(candidate))) {
+      if (candidate !== embyBase) console.log(`✅ Emby joignable : ${candidate}`);
+      embyBase = candidate;
+      return embyBase;
+    }
+  }
+  console.warn(`⚠️  Emby injoignable depuis le serveur Soundy (EMBY_URL = ${EMBY_URL}). Vérifiez l'adresse.`);
+  return null;
+}
+
 async function verifyUser(token, userId) {
   if (!EMBY_URL) throw fail('misconfigured', 500);
+  const base = await resolveEmby();
+  if (!base) throw fail('embyUnreachable', 502);
   const key = `${token}:${userId}`;
   const cached = authCache.get(key);
   if (cached && cached.expires > Date.now()) return cached.user;
 
-  const res = await fetch(`${EMBY_URL}/Users/${encodeURIComponent(userId)}`, {
+  const res = await fetch(`${base}/Users/${encodeURIComponent(userId)}`, {
     headers: { 'X-Emby-Token': token },
     signal: AbortSignal.timeout(8000),
   }).catch(() => null);
@@ -244,7 +284,17 @@ app.use('/api', (req, res, next) => {
 
 app.use('/api', express.json({ limit: '32kb' }));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'soundy', emby: !!EMBY_URL }));
+// Diagnostic (sans aucune donnée sensible) : à ouvrir dans un navigateur
+// https://votre-soundy/api/health
+app.get('/api/health', async (_req, res) => {
+  const base = await resolveEmby();
+  res.json({
+    ok: true,
+    name: 'soundy',
+    emby: { configured: !!EMBY_URL, reachable: !!base, url: base ?? (EMBY_URL || null) },
+    notify: { configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null },
+  });
+});
 
 // Notification de test (admin) : vérifie le réglage WEBHOOK_URL
 app.post('/api/notify/test', auth, async (req, res) => {
@@ -370,4 +420,6 @@ if (existsSync(DIST_DIR)) {
 await loadStore();
 app.listen(PORT, () => {
   console.log(`🎧 Soundy écoute sur http://0.0.0.0:${PORT}  (Emby : ${EMBY_URL || 'non configuré'})`);
+  console.log(`🔔 Notifications des demandes : ${WEBHOOK_URL ? `activées (${webhookType(WEBHOOK_URL)})` : 'désactivées (WEBHOOK_URL vide)'}`);
+  void resolveEmby(true);
 });

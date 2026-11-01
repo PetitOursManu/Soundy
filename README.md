@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.5.0** | Bras de la platine qui avance sur le vinyle au fil du titre. Barre de défilement courbe qui suit la roue des titres. Serveur : `EMBY_URL` plus tolérante (suffixe `/emby` détecté, espaces / guillemets ignorés), diagnostic `/api/health`, messages d'erreur précis. Onglet Demandes : l'adresse saisie est utilisée immédiatement. |
 | **1.4.2** | Pochettes affichées pour les albums sans image propre dans Emby (celle d'un titre). Tri par artiste fiable : albums d'un même artiste côte à côte (variantes « feat. », majuscules, accents regroupées), puis ordre alphabétique. |
 | **1.4.1** | Notifications des demandes plus simples : service reconnu automatiquement (ntfy, Discord, Gotify, Slack), bouton de test dans les Réglages (admin), guide dans le README. |
 | **1.4.0** | **Favoris** par titre et par album (synchronisés avec Emby), filtre « Favoris » dans la bibliothèque (albums et titres). |
@@ -248,6 +249,20 @@ Quand un utilisateur envoie une demande d'ajout de musique, le serveur Soundy pe
 | `NOTIFY_LANG` | Langue des notifications : `fr` (défaut) ou `en`. |
 
 Exemple de notification reçue : **🎵 Nouvelle demande Soundy** — *Marie demande l'album « Random Access Memories » de Daft Punk*.
+
+**Ça ne marche pas ? Diagnostic en 1 clic** : ouvrez **`https://votre-soundy/api/health`** dans un navigateur.
+
+```json
+{ "emby": { "configured": true, "reachable": true, "url": "https://emby.mondomaine.fr" },
+  "notify": { "configured": true, "type": "ntfy" } }
+```
+
+- `"notify": { "configured": false }` → le serveur ne voit pas `WEBHOOK_URL` : dans Coolify, vérifiez que la
+  variable est bien disponible **au lancement** (*runtime*, pas seulement au *build*), puis **Redeploy**.
+- `"emby": { "reachable": false }` → le serveur Soundy n'arrive pas à joindre Emby avec `EMBY_URL` (adresse vue
+  **depuis le serveur**). Tant que c'est le cas, les demandes et le bouton de test ne peuvent pas fonctionner,
+  car le serveur vérifie votre compte auprès d'Emby. Soundy essaie automatiquement le suffixe `/emby`.
+- Les journaux du conteneur indiquent aussi au démarrage : `✅ Emby joignable` et `🔔 Notifications : activées (ntfy)`.
 
 > En cas d'échec, le bouton de test affiche la raison (par ex. `HTTP 401` = adresse ou jeton incorrect).
 > À ne pas confondre avec la **notification « Lecture en cours »** de l'appli Android : celle-ci est automatique

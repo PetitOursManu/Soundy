@@ -275,6 +275,7 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
   const session = useAuth((s) => s.session)!;
   const api = useMemo(() => new RequestsApi(requestsUrl, session), [requestsUrl, session]);
   const [status, setStatus] = useState<{ configured: boolean; type: string | null } | null | 'error'>(null);
+  const [errMsg, setErrMsg] = useState('');
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
@@ -282,7 +283,11 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
     api
       .notifyStatus()
       .then((st) => alive && setStatus(st))
-      .catch(() => alive && setStatus('error'));
+      .catch((e) => {
+        if (!alive) return;
+        setErrMsg((e as Error).message);
+        setStatus('error');
+      });
     return () => {
       alive = false;
     };
@@ -308,7 +313,7 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
           <strong style={{ fontSize: 15 }}>{t('notify.title')}</strong>
           <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
             {status === 'error'
-              ? t('notify.unavailable')
+              ? `${t('notify.unavailable')} : ${errMsg}`
               : status === null
                 ? '…'
                 : configured
@@ -320,7 +325,7 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
       </div>
       {!configured && status !== null && (
         <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 12 }}>
-          {t('notify.help')}
+          {status === 'error' ? t('notify.checkServer', { url: `${(requestsUrl || window.location.origin).replace(/\/+$/, '')}/api/health` }) : t('notify.help')}
         </p>
       )}
       <button className="btn sm" style={{ marginTop: 14 }} disabled={!configured || sending} onClick={() => void test()}>

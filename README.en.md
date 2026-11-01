@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.5.0** | Turntable arm moving across the record as the track plays. Curved scrollbar following the track wheel. Server: more tolerant `EMBY_URL` (`/emby` suffix detected, spaces / quotes ignored), `/api/health` diagnostics, precise error messages. Requests tab: the entered address is used immediately. |
 | **1.4.2** | Artwork shown for albums without their own image in Emby (taken from a track). Reliable artist sort: albums by the same artist side by side ("feat.", case and accent variants grouped), then alphabetical order. |
 | **1.4.1** | Simpler request notifications: service detected automatically (ntfy, Discord, Gotify, Slack), test button in Settings (admin), guide in the README. |
 | **1.4.0** | **Favorites** by track and by album (synced with Emby), "Favorites" filter in the library (albums and tracks). |
@@ -248,6 +249,20 @@ service is **detected automatically** from the address.
 | `NOTIFY_LANG` | Notification language: `fr` (default) or `en` — set `en` for English notifications. |
 
 Example of a received notification: **🎵 New Soundy request** — *Mary asks for the album “Random Access Memories” by Daft Punk*.
+
+**Not working? One-click diagnostics**: open **`https://your-soundy/api/health`** in a browser.
+
+```json
+{ "emby": { "configured": true, "reachable": true, "url": "https://emby.mydomain.com" },
+  "notify": { "configured": true, "type": "ntfy" } }
+```
+
+- `"notify": { "configured": false }` → the server does not see `WEBHOOK_URL`: in Coolify, make sure the
+  variable is available **at runtime** (not only at build time), then **Redeploy**.
+- `"emby": { "reachable": false }` → the Soundy server cannot reach Emby with `EMBY_URL` (address as seen
+  **from the server**). Until it can, requests and the test button cannot work, because the server checks your
+  account with Emby. Soundy automatically tries the `/emby` suffix.
+- The container logs also show at startup: `✅ Emby joignable` and `🔔 Notifications des demandes : activées (ntfy)`.
 
 > If sending fails, the test button shows why (e.g. `HTTP 401` = wrong address or token).
 > Not to be confused with the Android app's **"Now playing" notification**: that one is automatic and needs

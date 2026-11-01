@@ -31,6 +31,11 @@ import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { FavoriteButton } from '../components/FavoriteButton';
 
+// Angles du bras (degrés) : repos hors du disque, début (bord extérieur), fin (bord de la pochette)
+const ARM_REST = -8;
+const ARM_START = 2;
+const ARM_END = 11.5;
+
 export default function Player() {
   const navigate = useNavigate();
   const track = usePlayer((s) => s.queue[s.index]);
@@ -65,6 +70,9 @@ export default function Player() {
   }
 
   const shownTime = preview ?? currentTime;
+  const total = duration || track.duration;
+  const progress = total > 0 ? Math.min(1, Math.max(0, shownTime / total)) : 0;
+  const armOnRecord = isPlaying || currentTime > 0;
   const RepeatIcon = repeat === 'one' ? IconRepeatOne : IconRepeat;
 
   return (
@@ -91,7 +99,12 @@ export default function Player() {
             <Cover imageId={track.imageId} tag={track.imageTag} size={600} alt={track.album} />
             <span className="hole" />
           </div>
-          <div className={`tonearm ${isPlaying ? 'on' : ''}`}>
+          {/* Bras de lecture : posé sur le bord extérieur au début du titre, il avance
+              vers le centre au fil de la lecture (comme une vraie platine) */}
+          <div
+            className={`tonearm ${armOnRecord ? 'on' : ''}`}
+            style={{ transform: `rotate(${armOnRecord ? ARM_START + (ARM_END - ARM_START) * progress : ARM_REST}deg)` }}
+          >
             <span className="base" />
             <span className="arm" />
             <span className="head" />
