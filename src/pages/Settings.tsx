@@ -175,7 +175,7 @@ export default function Settings() {
         </button>
       </div>
       <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 24 }}>
-        Soundy v{APP_VERSION}
+        Soundy v{APP_VERSION} · build du {__BUILD__}
       </p>
 
       <Sheet

@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// Date de compilation, affichée dans les Réglages (pour vérifier la version déployée)
+const BUILD = new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'short', timeStyle: 'short' });
+
 export default defineConfig({
   plugins: [react()],
+  define: { __BUILD__: JSON.stringify(BUILD) },
   base: './',
   server: {
     host: true,

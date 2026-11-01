@@ -11,3 +11,4 @@ android/local.properties
 android/app/src/main/assets/public
 server/node_modules
 tsconfig.tsbuildinfo
+comparaison-roue.png
