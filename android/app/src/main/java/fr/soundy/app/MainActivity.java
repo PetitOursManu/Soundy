@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -15,6 +16,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SoundyAudioPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Pas d'effet d'étirement / de lueur quand on arrive en haut ou en bas d'une page
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
+        }
 
         // Android 13+ : autorisation d'afficher la notification de lecture
         if (Build.VERSION.SDK_INT >= 33
