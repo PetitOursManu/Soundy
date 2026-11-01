@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { MusicRequest, NewRequest, RequestsApi, RequestStatus, RequestType } from '../api/requests';
 import { Empty } from '../components/Empty';
-import { IconAlert, IconCheck, IconDisc, IconInbox, IconMusic, IconPlus, IconSend, IconTrash, IconUser, IconX } from '../components/Icons';
+import { IconAlert, IconCheck, IconDisc, IconInbox, IconMusic, IconPlus, IconSend, IconServer, IconTrash, IconUser, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
+import { isNative } from '../lib/native';
 import { useAuth } from '../store/auth';
 import { useNetwork } from '../store/network';
 import { useSettings } from '../store/settings';
@@ -44,8 +44,11 @@ export default function Requests() {
   const [all, setAll] = useState<MusicRequest[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Appli Android : l'adresse du serveur Soundy doit être renseignée (pas de « même origine »)
+  const needsSetup = isNative() && !requestsUrl;
+
   const refresh = useCallback(async () => {
-    if (!online) return;
+    if (!online || needsSetup) return;
     setError(null);
     try {
       const [m, a] = await Promise.all([api.list('mine'), session.isAdmin ? api.list('all') : Promise.resolve(null)]);
@@ -54,7 +57,7 @@ export default function Requests() {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [api, online, session.isAdmin]);
+  }, [api, online, session.isAdmin, needsSetup]);
 
   useEffect(() => {
     void refresh();
@@ -81,17 +84,8 @@ export default function Requests() {
       <div style={{ marginTop: 24 }}>
         {!online ? (
           <Empty icon={<IconAlert />} title="Hors ligne" text="Les demandes nécessitent une connexion Internet." />
-        ) : error ? (
-          <Empty icon={<IconAlert />} title="Service de demandes indisponible" text={`${error} Vérifiez l'adresse du serveur Soundy dans les réglages.`}>
-            <div className="row" style={{ justifyContent: 'center', gap: 14 }}>
-              <button className="btn" onClick={() => void refresh()}>
-                Réessayer
-              </button>
-              <Link className="btn" to="/settings">
-                Réglages
-              </Link>
-            </div>
-          </Empty>
+        ) : needsSetup || error ? (
+          <ServerSetup error={needsSetup ? null : error} onRetry={() => void refresh()} />
         ) : tab === 'new' ? (
           <RequestForm
             api={api}
@@ -129,6 +123,80 @@ export default function Requests() {
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Adresse du serveur de demandes (appli Android / serveur injoignable)
+// ---------------------------------------------------------------------------
+function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => void }) {
+  const current = useSettings((s) => s.requestsUrl);
+  const update = useSettings((s) => s.update);
+  const [url, setUrl] = useState(current);
+  const [testing, setTesting] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let base = url.trim().replace(/\/+$/, '');
+    if (base && !/^https?:\/\//i.test(base)) base = `https://${base}`;
+    if (!base) return setMsg("Indiquez l'adresse du serveur Soundy.");
+    setTesting(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || data?.name !== 'soundy') throw new Error();
+      update({ requestsUrl: base });
+      toast('Serveur de demandes enregistré ✓', 'success');
+      onRetry();
+    } catch {
+      setMsg(`Aucun serveur Soundy trouvé à « ${base} ».`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <form className="card" onSubmit={save} style={{ padding: 22 }}>
+      <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{error ? 'Service de demandes indisponible' : 'Serveur de demandes'}</h3>
+      <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
+        {error
+          ? `${error} Vérifiez l'adresse ci-dessous.`
+          : "Indiquez l'adresse de votre serveur Soundy (celle de la version web, ex. https://soundy.mondomaine.fr)."}
+      </p>
+      <div className="field">
+        <label htmlFor="rq-server">Adresse du serveur Soundy</label>
+        <div className="input-wrap">
+          <IconServer />
+          <input
+            id="rq-server"
+            type="url"
+            inputMode="url"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="https://soundy.mondomaine.fr"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+        </div>
+      </div>
+      {msg && (
+        <p className="error-text" style={{ marginBottom: 14 }}>
+          {msg}
+        </p>
+      )}
+      <div className="row" style={{ gap: 12 }}>
+        <button className="btn accent" type="submit" disabled={testing} style={{ flex: 1 }}>
+          {testing ? <span className="loader" style={{ width: 18, height: 18 }} /> : 'Enregistrer'}
+        </button>
+        {error && (
+          <button className="btn" type="button" onClick={onRetry}>
+            Réessayer
+          </button>
+        )}
+      </div>
+    </form>
   );
 }
 

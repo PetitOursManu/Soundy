@@ -46,7 +46,7 @@ export default function Login() {
   };
 
   return (
-    <div className="welcome">
+    <div className={`welcome ${step === 'form' ? 'form' : ''}`}>
       <Brand size={44} />
       <div className="discs" aria-hidden>
         <div className="half" />
@@ -78,7 +78,7 @@ export default function Login() {
           </button>
         </>
       ) : (
-        <form className="login-card" onSubmit={submit} style={{ marginTop: 40 }}>
+        <form className="login-card" onSubmit={submit} style={{ marginTop: 'auto', marginBottom: 'auto', paddingTop: 20 }}>
           <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>Connexion</h1>
           <p className="tagline" style={{ margin: '8px 0 28px' }}>
             Connectez-vous avec votre compte Emby.

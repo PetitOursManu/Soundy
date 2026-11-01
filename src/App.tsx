@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { onBackButton } from './lib/backButton';
 import { BottomNav } from './components/BottomNav';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { MiniPlayer } from './components/MiniPlayer';
 import { Toasts } from './components/Toasts';
 import Library from './pages/Library';
@@ -69,6 +70,7 @@ function Shell() {
 
   return (
     <div className={hasMini ? 'has-mini' : ''}>
+      <ErrorBoundary key={location.pathname}>
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<Library />} />
@@ -80,6 +82,7 @@ function Shell() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
       {!onPlayer && (
         <>
           <MiniPlayer />

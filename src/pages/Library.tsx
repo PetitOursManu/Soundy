@@ -19,8 +19,8 @@ import type { DownloadedTrack } from '../lib/db';
 type View = 'albums' | 'tracks';
 
 const ALBUM_SORTS: { value: SortKey; label: string }[] = [
-  { value: 'name', label: 'A → Z' },
   { value: 'artist', label: 'Artiste' },
+  { value: 'name', label: 'A → Z' },
   { value: 'recent', label: 'Ajouts récents' },
   { value: 'year', label: 'Année' },
 ];
@@ -60,7 +60,9 @@ export function groupByAlbum(tracks: DownloadedTrack[]): (Album & { tracks: Down
 export default function Library() {
   const [params, setParams] = useSearchParams();
   const view: View = params.get('view') === 'tracks' ? 'tracks' : 'albums';
-  const [sort, setSort] = useState<SortKey>(() => (sessionStorage.getItem(`sort:${view}`) as SortKey) || 'name');
+  // Par défaut : albums rangés par artiste puis par ordre alphabétique ; titres de A à Z
+  const defaultSort = (v: View): SortKey => (v === 'albums' ? 'artist' : 'name');
+  const [sort, setSort] = useState<SortKey>(() => (sessionStorage.getItem(`sort2:${view}`) as SortKey) || defaultSort(view));
   const client = useAuth((s) => s.client);
   const online = useNetwork((s) => s.online);
   const downloaded = useDownloads((s) => s.downloaded);
@@ -68,10 +70,10 @@ export default function Library() {
 
   const setView = (v: View) => {
     setParams(v === 'albums' ? {} : { view: v }, { replace: true });
-    setSort((sessionStorage.getItem(`sort:${v}`) as SortKey) || 'name');
+    setSort((sessionStorage.getItem(`sort2:${v}`) as SortKey) || defaultSort(v));
   };
   const changeSort = (s: SortKey) => {
-    sessionStorage.setItem(`sort:${view}`, s);
+    sessionStorage.setItem(`sort2:${view}`, s);
     setSort(s);
   };
 

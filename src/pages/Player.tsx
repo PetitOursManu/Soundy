@@ -24,6 +24,7 @@ import { QueueSheet } from '../components/QueueSheet';
 import { Slider } from '../components/Slider';
 import { TrackMenu } from '../components/TrackRow';
 import { formatTime } from '../lib/format';
+import { hapticClick } from '../lib/haptics';
 import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
@@ -126,21 +127,21 @@ export default function Player() {
         </div>
 
         <div className="controls">
-          <button className={`icon-btn ${shuffle ? 'active' : ''}`} onClick={toggleShuffle} aria-label="Aléatoire" aria-pressed={shuffle}>
+          <button className={`icon-btn ${shuffle ? 'active' : ''}`} onClick={() => (hapticClick(), toggleShuffle())} aria-label="Aléatoire" aria-pressed={shuffle}>
             <IconShuffle />
           </button>
-          <button className="icon-btn skip" onClick={prev} aria-label="Précédent">
+          <button className="icon-btn skip" onClick={() => (hapticClick(), prev())} aria-label="Précédent">
             <IconPrev />
           </button>
-          <button className="icon-btn accent main" onClick={toggle} aria-label={isPlaying ? 'Pause' : 'Lecture'}>
+          <button className="icon-btn accent main" onClick={() => (hapticClick(), toggle())} aria-label={isPlaying ? 'Pause' : 'Lecture'}>
             {buffering && isPlaying ? <span className="loader" /> : isPlaying ? <IconPause /> : <IconPlay style={{ marginLeft: 4 }} />}
           </button>
-          <button className="icon-btn skip" onClick={next} aria-label="Suivant">
+          <button className="icon-btn skip" onClick={() => (hapticClick(), next())} aria-label="Suivant">
             <IconNext />
           </button>
           <button
             className={`icon-btn ${repeat !== 'off' ? 'active' : ''}`}
-            onClick={cycleRepeat}
+            onClick={() => (hapticClick(), cycleRepeat())}
             aria-label={repeat === 'one' ? 'Répéter le titre' : repeat === 'all' ? 'Répéter la file' : 'Répétition désactivée'}
           >
             <RepeatIcon />

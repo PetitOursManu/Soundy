@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { hapticClick } from '../lib/haptics';
 import { usePlayer } from '../store/player';
 import { Cover } from './Cover';
 import { IconNext, IconPause, IconPlay } from './Icons';
@@ -23,10 +24,10 @@ export function MiniPlayer() {
         <div className="t ellipsis">{track.title}</div>
         <div className="s ellipsis">{track.artist}</div>
       </div>
-      <button className="icon-btn accent" onClick={toggle} aria-label={isPlaying ? 'Pause' : 'Lecture'}>
+      <button className="icon-btn accent" onClick={() => (hapticClick(), toggle())} aria-label={isPlaying ? 'Pause' : 'Lecture'}>
         {buffering && isPlaying ? <span className="loader" style={{ width: 18, height: 18 }} /> : isPlaying ? <IconPause /> : <IconPlay style={{ marginLeft: 2 }} />}
       </button>
-      <button className="icon-btn flat" onClick={next} aria-label="Suivant">
+      <button className="icon-btn flat" onClick={() => (hapticClick(), next())} aria-label="Suivant">
         <IconNext />
       </button>
       <div className="bar">

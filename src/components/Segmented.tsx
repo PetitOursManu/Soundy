@@ -1,3 +1,5 @@
+import { hapticTick } from '../lib/haptics';
+
 interface Option<T extends string> {
   value: T;
   label: string;
@@ -27,7 +29,10 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
           role="tab"
           aria-selected={o.value === value}
           className={o.value === value ? 'on' : ''}
-          onClick={() => onChange(o.value)}
+          onClick={() => {
+            if (o.value !== value) hapticTick();
+            onChange(o.value);
+          }}
         >
           {o.icon}
           {o.label}

@@ -13,6 +13,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Track } from '../api/emby';
 import { formatTime } from '../lib/format';
+import { hapticClick, hapticHeavy, hapticTick } from '../lib/haptics';
 import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
@@ -124,6 +125,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     if (f !== focusRef.current) {
       focusRef.current = f;
       setFocus(f);
+      hapticTick(); // petite vibration douce à chaque titre
     }
   }, []);
 
@@ -347,7 +349,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
         if (drag.current && !drag.current.moved) {
           drag.current = null;
           suppressNextClick();
-          navigator.vibrate?.(15);
+          hapticHeavy();
           setMenu(tracksRef.current[Number(item.dataset.index)]);
         }
       }, 550);
@@ -533,6 +535,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
           disabled={unavailable}
           onClick={(e) => {
             e.stopPropagation();
+            hapticClick();
             if (isCurrent) toggle();
             else onPlay(index);
           }}

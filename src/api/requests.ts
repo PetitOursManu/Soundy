@@ -46,13 +46,18 @@ export class RequestsApi {
     } catch {
       throw new Error('Serveur de demandes injoignable.');
     }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`);
+    // Une page HTML (et non du JSON) = ce n'est pas le serveur Soundy à cette adresse
+    const isJson = (res.headers.get('Content-Type') || '').includes('application/json');
+    if (!isJson) throw new Error("Aucun serveur Soundy à cette adresse.");
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `Erreur ${res.status}`);
     return data as T;
   }
 
-  list(scope: 'mine' | 'all') {
-    return this.call<MusicRequest[]>(`/requests?scope=${scope}`);
+  async list(scope: 'mine' | 'all') {
+    const data = await this.call<MusicRequest[]>(`/requests?scope=${scope}`);
+    if (!Array.isArray(data)) throw new Error('Réponse inattendue du serveur de demandes.');
+    return data;
   }
 
   create(req: NewRequest) {

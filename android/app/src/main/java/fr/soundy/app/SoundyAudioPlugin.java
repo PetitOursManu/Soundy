@@ -5,7 +5,11 @@ import android.content.Intent;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
 import android.os.Build;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.provider.Settings;
+import android.view.HapticFeedbackConstants;
+import android.view.View;
 
 import androidx.core.content.ContextCompat;
 
@@ -104,6 +108,43 @@ public class SoundyAudioPlugin extends Plugin {
             ContextCompat.startForegroundService(ctx, new Intent(ctx, PlaybackService.class));
         }
         call.resolve();
+    }
+
+    /**
+     * Petite vibration (retour haptique du système) :
+     *  - "tick"  : très léger, défilement des titres
+     *  - "click" : appui sur un bouton
+     *  - "heavy" : appui long
+     */
+    @PluginMethod
+    public void haptic(PluginCall call) {
+        final String type = call.getString("type", "tick");
+        getActivity().runOnUiThread(() -> {
+            View view = getBridge().getWebView();
+            int constant;
+            switch (type) {
+                case "click": constant = HapticFeedbackConstants.VIRTUAL_KEY; break;
+                case "heavy": constant = HapticFeedbackConstants.LONG_PRESS; break;
+                default: constant = HapticFeedbackConstants.CLOCK_TICK;
+            }
+            boolean done = view != null && view.performHapticFeedback(constant);
+            if (!done) vibrateFallback(type);
+        });
+        call.resolve();
+    }
+
+    private void vibrateFallback(String type) {
+        Vibrator vibrator = (Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator == null || !vibrator.hasVibrator()) return;
+        if (Build.VERSION.SDK_INT >= 29) {
+            int effect = "heavy".equals(type) ? VibrationEffect.EFFECT_HEAVY_CLICK
+                : "click".equals(type) ? VibrationEffect.EFFECT_CLICK : VibrationEffect.EFFECT_TICK;
+            vibrator.vibrate(VibrationEffect.createPredefined(effect));
+        } else if (Build.VERSION.SDK_INT >= 26) {
+            vibrator.vibrate(VibrationEffect.createOneShot("heavy".equals(type) ? 30 : 10, 90));
+        } else {
+            vibrator.vibrate("heavy".equals(type) ? 30 : 10);
+        }
     }
 
     private static String typeOf(int t) {

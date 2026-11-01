@@ -2,6 +2,7 @@ import { memo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Album } from '../api/emby';
 import { albumPath } from '../lib/albums';
+import { hapticClick, hapticHeavy } from '../lib/haptics';
 import { Cover } from './Cover';
 import { IconCheck, IconDownloaded } from './Icons';
 
@@ -37,6 +38,7 @@ export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting,
         }
         if (selecting) {
           e.preventDefault();
+          hapticClick();
           onToggle?.(album);
         }
       }}
@@ -52,7 +54,7 @@ export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting,
         longPressed.current = false;
         timer.current = window.setTimeout(() => {
           longPressed.current = true;
-          navigator.vibrate?.(15);
+          hapticHeavy();
           if (selecting) onToggle?.(album);
           else onLongPress(album);
         }, 500);

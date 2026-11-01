@@ -32,7 +32,7 @@
   --radius: 20px;
   --radius-sm: 14px;
   --nav-h: 72px;
-  --mini-h: 68px;
+  --mini-h: 78px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -982,7 +982,7 @@ input[type='search']::-webkit-search-decoration {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 10px 0 10px;
+  padding: 0 10px 12px 10px;
   overflow: hidden;
   animation: mini-in 0.5s var(--ease);
 }
@@ -1019,9 +1019,9 @@ input[type='search']::-webkit-search-decoration {
 
 .mini-player .bar {
   position: absolute;
-  left: 22px;
-  right: 22px;
-  bottom: 6px;
+  left: 24px;
+  right: 24px;
+  bottom: 9px;
   height: 3px;
   border-radius: 3px;
   background: var(--bg-deep);
@@ -1060,7 +1060,7 @@ input[type='search']::-webkit-search-decoration {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: calc(var(--safe-top) + 18px) 26px calc(var(--safe-bottom) + 26px);
+  padding: calc(var(--safe-top) + 18px) 20px calc(var(--safe-bottom) + 26px);
   overflow-y: auto;
   animation: player-in 0.45s var(--ease);
 }
@@ -1170,7 +1170,7 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .tonearm.on {
-  transform: rotate(17deg);
+  transform: rotate(4deg);
 }
 
 .tonearm .base {
@@ -1344,13 +1344,15 @@ input[type='search']::-webkit-search-decoration {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   width: 100%;
+  max-width: 380px;
   margin-top: clamp(16px, 4vh, 30px);
 }
 
 .controls .main {
-  width: 84px;
-  height: 84px;
+  width: 76px;
+  height: 76px;
 }
 
 .controls .main svg {
@@ -1359,8 +1361,20 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .controls .skip {
-  width: 62px;
-  height: 62px;
+  width: 56px;
+  height: 56px;
+}
+
+.controls > .icon-btn:first-child,
+.controls > .icon-btn:last-child {
+  width: 42px;
+  height: 42px;
+}
+
+.controls > .icon-btn:first-child svg,
+.controls > .icon-btn:last-child svg {
+  width: 18px;
+  height: 18px;
 }
 
 .controls .skip svg {
@@ -1738,14 +1752,21 @@ input[type='search']::-webkit-search-decoration {
    Écran d'accueil / connexion
    -------------------------------------------------------------------------- */
 .welcome {
-  min-height: 100dvh;
+  /* Plein écran sans défilement : toutes les tailles suivent la hauteur d'écran */
+  --d: min(200px, 23dvh, 46vw);
+  height: 100dvh;
   max-width: 480px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  padding: calc(var(--safe-top) + 30px) 26px calc(var(--safe-bottom) + 30px);
+  padding: calc(var(--safe-top) + min(30px, 3.5dvh)) 26px calc(var(--safe-bottom) + min(30px, 3.5dvh));
   position: relative;
   overflow: hidden;
+}
+
+/* Formulaire : défilement possible uniquement quand le clavier est ouvert */
+.welcome.form {
+  overflow-y: auto;
 }
 
 .welcome::before {
@@ -1761,15 +1782,16 @@ input[type='search']::-webkit-search-decoration {
 
 .discs {
   position: relative;
-  height: 220px;
-  margin-top: 10px;
+  height: calc(var(--d) * 1.1);
+  margin-top: min(10px, 1.2dvh);
+  flex: none;
 }
 
 .discs .half {
   position: absolute;
-  top: 10px;
-  width: 200px;
-  height: 200px;
+  top: calc(var(--d) * 0.05);
+  width: var(--d);
+  height: var(--d);
   border-radius: 50%;
   background: radial-gradient(circle, var(--bg) 0 13%, #d9d6cf 13.5% 15%, #ebe8e2 15.5% 100%);
   clip-path: inset(0 50% 0 0);
@@ -1787,16 +1809,16 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .discs .half:nth-child(2) {
-  left: 62px;
+  left: calc(var(--d) * 0.31);
   animation-delay: 0.1s;
 }
 
 .discs .cd {
   position: absolute;
   top: 0;
-  left: 140px;
-  width: 220px;
-  height: 220px;
+  left: calc(var(--d) * 0.7);
+  width: calc(var(--d) * 1.1);
+  height: calc(var(--d) * 1.1);
   border-radius: 50%;
   background:
     radial-gradient(circle, var(--bg) 0 9%, rgba(255, 255, 255, 0.85) 9.5% 17%, rgba(200, 205, 220, 0.9) 17.5% 18.5%, transparent 19%),
@@ -1824,7 +1846,7 @@ input[type='search']::-webkit-search-decoration {
 .cassette {
   position: absolute;
   right: -40px;
-  top: 250px;
+  top: calc(var(--d) * 1.1 + min(110px, 13dvh));
   width: 210px;
   height: 135px;
   border-radius: 14px;
@@ -1881,12 +1903,13 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .headline {
-  font-size: clamp(44px, 13vw, 58px);
+  font-size: clamp(36px, min(13vw, 7dvh), 58px);
   line-height: 1.02;
   font-weight: 800;
   letter-spacing: -0.045em;
   margin-top: auto;
-  padding-top: 170px;
+  position: relative;
+  z-index: 1;
 }
 
 .headline span {
@@ -1905,7 +1928,7 @@ input[type='search']::-webkit-search-decoration {
 
 .welcome .tagline {
   color: var(--text-2);
-  margin: 16px 0 30px;
+  margin: min(16px, 2dvh) 0 min(30px, 3.5dvh);
   font-size: 15px;
   line-height: 1.5;
 }
@@ -1914,14 +1937,22 @@ input[type='search']::-webkit-search-decoration {
   animation: page-in 0.5s var(--ease);
 }
 
-@media (max-height: 760px) {
-  .headline {
-    padding-top: 120px;
-  }
+@media (max-height: 740px) {
   .cassette {
-    top: 220px;
-    transform: scale(0.85) rotate(-4deg);
+    transform: scale(0.8) rotate(-4deg);
+    transform-origin: right top;
   }
+}
+
+@media (max-height: 640px) {
+  .cassette {
+    display: none;
+  }
+}
+
+/* Formulaire de connexion : les disques décoratifs laissent la place aux champs */
+.welcome.form .discs {
+  display: none;
 }
 
 @media (max-width: 400px) {
@@ -2365,4 +2396,13 @@ input[type='search']::-webkit-search-decoration {
 .select-bar .link svg {
   width: 13px;
   height: 13px;
+}
+
+@media (max-height: 600px) {
+  .welcome.form .field {
+    margin-bottom: 10px;
+  }
+  .welcome.form .tagline {
+    margin-bottom: 14px !important;
+  }
 }

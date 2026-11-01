@@ -21,6 +21,7 @@ interface SoundyAudioPlugin {
   getOutputs(): Promise<{ outputs: AudioOutput[] }>;
   openBluetoothSettings(): Promise<void>;
   updatePlayback(info: PlaybackInfo): Promise<void>;
+  haptic(opts: { type: 'tick' | 'click' | 'heavy' }): Promise<void>;
   addListener(event: 'mediaAction', cb: (e: { action: string }) => void): Promise<{ remove: () => Promise<void> }>;
 }
 
@@ -47,4 +48,8 @@ export function updateNativePlayback(info: PlaybackInfo) {
 
 export function onNativeMediaAction(cb: (action: string) => void) {
   if (isNative()) void SoundyAudio.addListener('mediaAction', (e) => cb(e.action));
+}
+
+export function nativeHaptic(type: 'tick' | 'click' | 'heavy') {
+  SoundyAudio.haptic({ type }).catch(() => {});
 }

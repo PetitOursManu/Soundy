@@ -91,6 +91,22 @@ export default function Settings() {
         ]}
       />
 
+      <div className="section-title">Vibrations</div>
+      <button
+        className="card row"
+        style={{ width: '100%', justifyContent: 'space-between', textAlign: 'left' }}
+        onClick={() => settings.update({ haptics: !settings.haptics })}
+        aria-pressed={settings.haptics}
+      >
+        <span>
+          <strong style={{ fontSize: 15 }}>Petites vibrations</strong>
+          <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 3 }}>
+            En défilant les titres et sur les boutons de lecture
+          </span>
+        </span>
+        <span className={`switch ${settings.haptics ? 'on' : ''}`} />
+      </button>
+
       <div className="section-title">Lecture</div>
       <div className="card">
         <div className="field" style={{ marginBottom: 0 }}>

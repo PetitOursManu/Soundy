@@ -10,6 +10,8 @@ interface Settings {
   downloadQuality: DownloadQuality;
   /** URL du serveur de demandes Soundy (vide = même origine que l'app). */
   requestsUrl: string;
+  /** Petites vibrations (défilement, boutons). */
+  haptics: boolean;
 }
 
 interface SettingsState extends Settings {
@@ -23,6 +25,7 @@ const defaults: Settings = {
   streamBitrate: 140_000_000,
   downloadQuality: 'original',
   requestsUrl: import.meta.env.VITE_REQUESTS_URL ?? '',
+  haptics: true,
 };
 
 function load(): Settings {

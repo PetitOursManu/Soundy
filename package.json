@@ -1,7 +1,7 @@
 {
   "name": "soundy",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Soundy — lecteur de musique neumorphique pour Emby (web + Android)",
   "type": "module",
   "scripts": {
