@@ -16,6 +16,23 @@ Il fonctionne dans le navigateur (application web installable / PWA) et sur **An
 
 ---
 
+## 🔑 Identifiants
+
+**Il n'y a pas d'identifiants par défaut** : Soundy n'a pas de comptes propres.
+On se connecte avec un **compte utilisateur Emby** :
+
+| Champ | Valeur |
+|---|---|
+| Adresse du serveur Emby | L'URL d'Emby, ex. `https://emby.mondomaine.fr` (Soundy essaie aussi `…/emby` automatiquement) |
+| Identifiant | Votre nom d'utilisateur Emby |
+| Mot de passe | Votre mot de passe Emby |
+
+- Un **administrateur Emby** est automatiquement administrateur dans Soundy (onglet *Demandes → Gestion*).
+- Pour ajouter un utilisateur : créez-le dans Emby (*Tableau de bord → Utilisateurs*), rien à faire dans Soundy.
+- Pour qu'il puisse télécharger : cochez **« Autoriser le téléchargement de médias »** dans ses droits Emby.
+
+---
+
 ## 🧱 Architecture
 
 ```
