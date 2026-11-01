@@ -29,6 +29,7 @@ import { hapticClick } from '../lib/haptics';
 import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
+import { FavoriteButton } from '../components/FavoriteButton';
 
 export default function Player() {
   const navigate = useNavigate();
@@ -151,6 +152,7 @@ export default function Player() {
         </div>
 
         <div className="player-actions">
+          <FavoriteButton item={track} />
           <button
             className="icon-btn"
             aria-label={downloaded ? t('common.downloaded') : t('player.download')}

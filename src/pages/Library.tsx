@@ -4,7 +4,7 @@ import type { Album, SortKey, Track } from '../api/emby';
 import { AlbumCard, AlbumCardSkeleton } from '../components/AlbumCard';
 import { Brand } from '../components/Brand';
 import { Empty } from '../components/Empty';
-import { IconAlert, IconCheck, IconCloudOff, IconDisc, IconDownload, IconList, IconSettings, IconShuffle, IconX } from '../components/Icons';
+import { IconAlert, IconCheck, IconHeart, IconHeartFilled, IconCloudOff, IconDisc, IconDownload, IconList, IconSettings, IconShuffle, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { TrackWheel } from '../components/TrackWheel';
 import { Key, useT } from '../i18n';
@@ -12,6 +12,7 @@ import { artistTokens, mergeAlbums, normName } from '../lib/albums';
 import { usePaged, useScrollRestore, useSentinel } from '../lib/hooks';
 import { useAuth } from '../store/auth';
 import { useDownloads } from '../store/downloads';
+import { useFavorites } from '../store/favorites';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { toast } from '../store/toast';
@@ -79,11 +80,27 @@ export default function Library() {
     setSort(s);
   };
 
-  const albums = usePaged<Album>(online && view === 'albums' ? `albums-${sort}` : null, (start, signal) =>
-    client!.getAlbums({ start, sort, signal }),
+  // Filtre « Favoris » (favoris Emby) : la liste est rechargée à l'activation du filtre ;
+  // ensuite les ajouts / retraits sont reflétés tout de suite côté appli.
+  const [favOnly, setFavOnly] = useState(() => sessionStorage.getItem('soundy.favOnly') === '1');
+  const toggleFavOnly = () => {
+    sessionStorage.setItem('soundy.favOnly', favOnly ? '0' : '1');
+    setFavOnly(!favOnly);
+  };
+  const favOverrides = useFavorites((st) => st.overrides);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const favVersion = useMemo(() => useFavorites.getState().version, [favOnly, view]);
+  const favKey = favOnly ? `-fav${favVersion}` : '';
+  const isFav = (item: { id: string; ids?: string[]; favorite?: boolean }) => {
+    const known = (item.ids ?? [item.id]).map((id) => favOverrides[id]).filter((v) => v !== undefined);
+    return known.length ? known.some(Boolean) : !!item.favorite;
+  };
+
+  const albums = usePaged<Album>(online && view === 'albums' ? `albums-${sort}${favKey}` : null, (start, signal) =>
+    client!.getAlbums({ start, sort, favorites: favOnly, signal }),
   );
-  const tracks = usePaged<Track>(online && view === 'tracks' ? `tracks-${sort}` : null, (start, signal) =>
-    client!.getTracks({ start, sort, signal }),
+  const tracks = usePaged<Track>(online && view === 'tracks' ? `tracks-${sort}${favKey}` : null, (start, signal) =>
+    client!.getTracks({ start, sort, favorites: favOnly, signal }),
   );
   const list = view === 'albums' ? albums : tracks;
   const sentinel = useSentinel(albums.loadMore, online && view === 'albums' && !albums.done && !albums.error, `${sort}-${albums.items.length}`);
@@ -95,7 +112,9 @@ export default function Library() {
   }, [online, view, tracks]);
 
   // Albums éclatés par Emby réunis (voir lib/albums.ts)
-  const mergedAlbums = useMemo(() => mergeAlbums(albums.items), [albums.items]);
+  const allMerged = useMemo(() => mergeAlbums(albums.items), [albums.items]);
+  const mergedAlbums = useMemo(() => (favOnly ? allMerged.filter(isFav) : allMerged), [allMerged, favOnly, favOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownTracks = useMemo(() => (favOnly ? tracks.items.filter(isFav) : tracks.items), [tracks.items, favOnly, favOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Sélection multiple (téléchargement de plusieurs albums) ---------------
   const [selecting, setSelecting] = useState(false);
@@ -204,6 +223,9 @@ export default function Library() {
 
       {online && (
         <div className="chips" style={{ marginTop: 18 }}>
+          <button className={`chip fav-chip ${favOnly ? 'on' : ''}`} onClick={toggleFavOnly} aria-pressed={favOnly}>
+            {favOnly ? <IconHeartFilled /> : <IconHeart />} {t('fav.filter')}
+          </button>
           {(view === 'albums' ? ALBUM_SORTS : TRACK_SORTS).map((s) => (
             <button key={s.value} className={`chip ${sort === s.value ? 'on' : ''}`} onClick={() => changeSort(s.value)}>
               {t(s.label)}
@@ -211,7 +233,7 @@ export default function Library() {
           ))}
           {list.total > 0 && (
             <span className="muted" style={{ alignSelf: 'center', fontSize: 12.5, whiteSpace: 'nowrap', paddingLeft: 4 }}>
-              {(view === 'albums' ? Math.max(mergedAlbums.length, list.total - (albums.items.length - mergedAlbums.length)) : list.total).toLocaleString(locale)}{' '}
+              {(favOnly ? (view === 'albums' ? mergedAlbums.length : shownTracks.length) : view === 'albums' ? Math.max(mergedAlbums.length, list.total - (albums.items.length - allMerged.length)) : list.total).toLocaleString(locale)}{' '}
               {view === 'albums' ? t('library.albums').toLowerCase() : t('library.tracks').toLowerCase()}
             </span>
           )}
@@ -241,15 +263,15 @@ export default function Library() {
               {albums.loading && Array.from({ length: albums.items.length ? 2 : 6 }, (_, i) => <AlbumCardSkeleton key={`sk${i}`} />)}
             </div>
           ) : (
-            tracks.items.length > 0 ? (
+            shownTracks.length > 0 ? (
               <div className="wheel-area">
                 <TrackWheel
-                  key={sort}
-                  tracks={tracks.items}
-                  total={tracks.total}
+                  key={`${sort}${favOnly ? '-fav' : ''}`}
+                  tracks={shownTracks}
+                  total={favOnly ? shownTracks.length : tracks.total}
                   mode="tracks"
-                  storageKey={`tracks-${sort}`}
-                  onPlay={(i) => playQueue(tracks.items, i, { shuffle: false })}
+                  storageKey={`tracks-${sort}${favOnly ? '-fav' : ''}`}
+                  onPlay={(i) => playQueue(shownTracks, i, { shuffle: false })}
                   onNearEnd={tracks.loadMore}
                 />
               </div>
@@ -268,7 +290,10 @@ export default function Library() {
             </button>
           </Empty>
         )}
-        {online && list.done && !list.items.length && !list.error && (
+        {online && list.done && !list.error && favOnly && !(view === 'albums' ? mergedAlbums.length : shownTracks.length) && (
+          <Empty icon={<IconHeart />} title={t('fav.emptyTitle')} text={view === 'albums' ? t('fav.emptyAlbums') : t('fav.emptyTracks')} />
+        )}
+        {online && list.done && !list.items.length && !list.error && !favOnly && (
           <Empty icon={<IconDisc />} title={t('library.empty')} text={t('library.emptyText')} />
         )}
         {view === 'albums' && <div ref={sentinel} className="sentinel" />}

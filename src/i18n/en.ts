@@ -313,6 +313,17 @@ const en: Record<keyof typeof fr, string> = {
   'downloads.queuedMany': '{n} tracks added to downloads',
   'downloads.queuedOne': 'Downloading “{title}”',
 
+  // --- Favorites -----------------------------------------------------------
+  'fav.add': 'Add to favorites',
+  'fav.remove': 'Remove from favorites',
+  'fav.added': 'Added to favorites ❤',
+  'fav.removed': 'Removed from favorites',
+  'fav.error': 'Unable to update favorites',
+  'fav.filter': 'Favorites',
+  'fav.emptyTitle': 'No favorites',
+  'fav.emptyAlbums': 'Tap the ❤ of an album to find it here.',
+  'fav.emptyTracks': 'Tap the ❤ of a track (in the wheel, the player or its menu) to find it here.',
+
   // --- Global errors -------------------------------------------------------
   'error.newVersion': 'New version available',
   'error.oops': 'Oops, something went wrong',

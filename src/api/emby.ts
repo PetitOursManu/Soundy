@@ -27,6 +27,7 @@ export interface Track {
   disc?: number;
   imageId?: string; // item portant la pochette (le titre ou son album)
   imageTag?: string;
+  favorite?: boolean; // favori Emby (synchronisé avec les autres applis Emby)
 }
 
 export interface Album {
@@ -38,6 +39,7 @@ export interface Album {
   imageTag?: string;
   coverId?: string; // item portant la pochette, si différent de l'album
   ids?: string[]; // identifiants Emby réunis (album éclaté par Emby, voir lib/albums.ts)
+  favorite?: boolean; // favori Emby
 }
 
 interface EmbyItem {
@@ -56,6 +58,7 @@ interface EmbyItem {
   ProductionYear?: number;
   ChildCount?: number;
   SongCount?: number;
+  UserData?: { IsFavorite?: boolean };
 }
 
 interface ItemsResponse {
@@ -134,6 +137,7 @@ function toTrack(i: EmbyItem): Track {
     disc: i.ParentIndexNumber,
     imageId: hasOwnImage ? i.Id : i.AlbumPrimaryImageTag ? i.AlbumId : undefined,
     imageTag: hasOwnImage ? i.ImageTags!.Primary : i.AlbumPrimaryImageTag,
+    favorite: !!i.UserData?.IsFavorite,
   };
 }
 
@@ -145,6 +149,7 @@ function toAlbum(i: EmbyItem): Album {
     year: i.ProductionYear,
     trackCount: i.ChildCount ?? i.SongCount,
     imageTag: i.ImageTags?.Primary,
+    favorite: !!i.UserData?.IsFavorite,
   };
 }
 
@@ -237,12 +242,13 @@ export class EmbyClient {
     return this.request<ItemsResponse>(`/Users/${this.session.userId}/Items?${qs}`, { signal });
   }
 
-  async getAlbums(opts: { start?: number; limit?: number; sort?: SortKey; signal?: AbortSignal } = {}): Promise<Page<Album>> {
+  async getAlbums(opts: { start?: number; limit?: number; sort?: SortKey; favorites?: boolean; signal?: AbortSignal } = {}): Promise<Page<Album>> {
     const sort = opts.sort ?? 'name';
     const r = await this.items(
       {
         IncludeItemTypes: 'MusicAlbum',
         Recursive: true,
+        Filters: opts.favorites ? 'IsFavorite' : undefined,
         SortBy: SORTS[sort],
         SortOrder: sort === 'recent' || sort === 'year' ? 'Descending' : 'Ascending',
         Fields: ALBUM_FIELDS,
@@ -256,13 +262,14 @@ export class EmbyClient {
     return { items: r.Items.map(toAlbum), total: r.TotalRecordCount };
   }
 
-  async getTracks(opts: { start?: number; limit?: number; sort?: SortKey; signal?: AbortSignal } = {}): Promise<Page<Track>> {
+  async getTracks(opts: { start?: number; limit?: number; sort?: SortKey; favorites?: boolean; signal?: AbortSignal } = {}): Promise<Page<Track>> {
     const sort = opts.sort ?? 'name';
     const sortBy = sort === 'artist' ? 'Artist,Album,ParentIndexNumber,IndexNumber' : SORTS[sort];
     const r = await this.items(
       {
         IncludeItemTypes: 'Audio',
         Recursive: true,
+        Filters: opts.favorites ? 'IsFavorite' : undefined,
         SortBy: sortBy,
         SortOrder: sort === 'recent' || sort === 'year' ? 'Descending' : 'Ascending',
         Fields: TRACK_FIELDS,
@@ -445,6 +452,11 @@ export class EmbyClient {
       method: 'POST',
       body: JSON.stringify({ ItemId: trackId, PlaySessionId: playSessionId, PositionTicks: Math.round(seconds * 10_000_000) }),
     }).catch(() => {});
+  }
+
+  /** Ajoute / retire un favori Emby (titre ou album). */
+  setFavorite(itemId: string, favorite: boolean) {
+    return this.request(`/Users/${this.session.userId}/FavoriteItems/${itemId}`, { method: favorite ? 'POST' : 'DELETE' });
   }
 
   logout() {

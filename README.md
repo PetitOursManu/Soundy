@@ -69,6 +69,7 @@
 | 📥 Téléchargement | Sur chaque album / titre, ou **plusieurs albums d'un coup** (bouton *Sélectionner* ou appui long). **Un titre téléchargé est toujours lu depuis l'appareil en priorité**, même connecté. Espace utilisé et suppression dans les Réglages. |
 | 💿 Bibliothèque | **Albums par défaut**, rangés **par artiste puis par ordre alphabétique**, ou vue **titre par titre**. Les albums « éclatés » par Emby (artiste de l'album différent selon les pistes) sont **réunis automatiquement**. |
 | 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent sur un cercle, le titre centré est mis en avant. **PC** : molette / trackpad, flèches, Page ↑/↓, Début/Fin, Entrée. **Mobile** : glisser au doigt. Menu d'un titre : clic droit / appui long. |
+| ❤ Favoris | Par **titre** et par **album** (❤ dans la page album, la roue, le lecteur et le menu d'un titre) ; filtre **« Favoris »** dans la bibliothèque. Ce sont les favoris d'**Emby** : synchronisés avec vos autres appareils et applis Emby. |
 | 🔍 Recherche | Par **album**, par **titre** et par **artiste** (filtres Tout / Albums / Titres), recherches récentes. |
 | 🎧 Bluetooth | Casque / enceinte Bluetooth, nom de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque / de la voiture. Lecture **écran éteint** avec notification de contrôle (Android). |
 | 📳 Vibrations | Petit retour haptique en défilant les titres et sur les boutons (désactivable). |
@@ -85,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.4.0** | **Favoris** par titre et par album (synchronisés avec Emby), filtre « Favoris » dans la bibliothèque (albums et titres). |
 | **1.3.0** | **Version anglaise** de l'appli : choix de la langue au premier lancement, dans les Réglages et sur l'écran de connexion (interface, notification Android, messages d'erreur du serveur). README en anglais. |
 | **1.2.2** | Nouveau logo (icônes, écran de démarrage, en-tête). Défilement tactile rétabli quand le doigt commence sur une carte d'album. |
 | **1.2.1** | Plus d'effet d'étirement / de rebond en haut et en bas des pages. |

@@ -5,7 +5,8 @@ import { albumPath } from '../lib/albums';
 import { hapticClick, hapticHeavy } from '../lib/haptics';
 import { useT } from '../i18n';
 import { Cover } from './Cover';
-import { IconCheck, IconDownloaded } from './Icons';
+import { IconCheck, IconDownloaded, IconHeartFilled } from './Icons';
+import { useIsFavorite } from '../store/favorites';
 
 interface Props {
   album: Album;
@@ -20,6 +21,7 @@ interface Props {
 
 export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting, selected, onToggle, onLongPress }: Props) {
   const { t } = useT();
+  const isFav = useIsFavorite(album);
   const timer = useRef<number>();
   const longPressed = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -67,6 +69,11 @@ export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting,
       onPointerUp={cancel}
       onPointerCancel={cancel}
     >
+      {!selecting && isFav && (
+        <span className="fav-badge" title={t('fav.filter')}>
+          <IconHeartFilled />
+        </span>
+      )}
       {selecting ? (
         <span className="select-dot" aria-hidden>
           {selected && <IconCheck />}

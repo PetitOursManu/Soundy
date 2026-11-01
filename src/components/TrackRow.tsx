@@ -6,10 +6,11 @@ import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { Cover } from './Cover';
-import { IconDisc, IconDownload, IconDownloaded, IconMore, IconPause, IconPlay, IconPlayNext, IconQueue, IconTrash, IconX } from './Icons';
+import { IconDisc, IconHeart, IconHeartFilled, IconDownload, IconDownloaded, IconMore, IconPause, IconPlay, IconPlayNext, IconQueue, IconTrash, IconX } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { MenuItem, Sheet } from './Sheet';
 import { useT } from '../i18n';
+import { useFavorites, useIsFavorite } from '../store/favorites';
 
 interface Props {
   track: Track;
@@ -28,6 +29,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
   const online = useNetwork((s) => s.online);
   const [menu, setMenu] = useState(false);
   const { t } = useT();
+  const isFav = useIsFavorite(track);
   const unavailable = !online && !downloaded;
 
   const play = () => {
@@ -69,6 +71,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
             ) : (
               downloaded && <IconDownloaded aria-label={t('common.downloaded')} />
             )}
+            {isFav && <IconHeartFilled className="fav-mark" aria-label={t('fav.filter')} />}
             <span className="ellipsis">{showAlbum && track.album ? `${track.artist} · ${track.album}` : track.artist}</span>
           </div>
         </div>
@@ -107,6 +110,8 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
   const { download, remove, cancel } = useDownloads.getState();
   const online = useNetwork((s) => s.online);
   const { t } = useT();
+  const fav = useIsFavorite(track);
+  const setFav = useFavorites((s) => s.set);
   const run = (fn: () => void) => () => {
     fn();
     onClose();
@@ -114,6 +119,11 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
 
   return (
     <Sheet open onClose={onClose} title={track.title} description={`${track.artist}${track.album ? ` · ${track.album}` : ''}`}>
+      <MenuItem
+        icon={fav ? <IconHeartFilled style={{ color: '#f0507a' }} /> : <IconHeart />}
+        label={fav ? t('fav.remove') : t('fav.add')}
+        onClick={run(() => void setFav([track.id], !fav))}
+      />
       <MenuItem icon={<IconPlayNext />} label={t('track.playNext')} onClick={run(() => addNext([track]))} />
       <MenuItem icon={<IconQueue />} label={t('track.addToQueue')} onClick={run(() => addToQueue([track]))} />
       {downloaded ? (

@@ -267,3 +267,7 @@ export const IconSun = (p: P) =>
     </>,
   );
 export const IconWave = (p: P) => base(p, <path d="M2 12h2M6 8v8M10 4v16M14 7v10M18 10v4M22 12h0" />);
+export const IconHeart = (p: P) =>
+  base(p, <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.4 1.1 5 2.9 1.6-1.8 3-2.9 5-2.9 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2Z" />);
+export const IconHeartFilled = (p: P) =>
+  base(p, <path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.4 1.1 5 2.9 1.6-1.8 3-2.9 5-2.9 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2Z" />, true);

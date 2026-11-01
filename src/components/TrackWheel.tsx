@@ -18,10 +18,12 @@ import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { Cover } from './Cover';
-import { IconDownloaded, IconMore, IconPause } from './Icons';
+import { IconDownloaded, IconHeartFilled, IconMore, IconPause } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { TrackMenu } from './TrackRow';
 import { useT } from '../i18n';
+import { useIsFavorite } from '../store/favorites';
+import { FavoriteButton } from './FavoriteButton';
 
 interface Props {
   tracks: Track[];
@@ -490,6 +492,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
   const isPlaying = usePlayer((s) => isCurrent && s.isPlaying);
   const toggle = usePlayer((s) => s.toggle);
   const { t } = useT();
+  const isFav = useIsFavorite(track);
   const downloaded = useDownloads((s) => !!s.downloaded[track.id]);
   const progress = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id)?.progress);
   const online = useNetwork((s) => s.online);
@@ -516,6 +519,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
         <span className="wt ellipsis">{track.title}</span>
         <span className="ws">
           {progress !== undefined ? <ProgressRing value={progress} size={13} /> : downloaded && <IconDownloaded aria-label={t('common.downloaded')} />}
+          {isFav && <IconHeartFilled className="fav-mark" aria-label={t('fav.filter')} />}
           <span className="ellipsis">{subtitle}</span>
         </span>
       </span>
@@ -531,6 +535,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
         >
           <IconMore />
         </button>
+        <FavoriteButton item={track} className="icon-btn sm flat" />
         <button
           className={`play-pill ${isCurrent ? 'on' : ''}`}
           aria-label={isPlaying ? t('common.pause') : t('common.play')}

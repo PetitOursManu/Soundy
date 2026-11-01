@@ -13,6 +13,7 @@ import { useAuth } from '../store/auth';
 import { useDownloadState, useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
+import { FavoriteButton } from '../components/FavoriteButton';
 
 export default function AlbumPage() {
   const { id = '' } = useParams();
@@ -141,6 +142,7 @@ export default function AlbumPage() {
         <button className="btn accent sm" onClick={() => playQueue(list, 0, { shuffle: false })} disabled={!list.length} style={{ height: 46, flex: 1 }}>
           <IconPlay /> {t('album.play')}
         </button>
+        {info && <FavoriteButton item={{ ...info, ids: album?.ids ?? allIds }} />}
         <button className="icon-btn" onClick={() => playQueue(list, 0, { shuffle: true })} disabled={!list.length} aria-label={t('library.shuffle')}>
           <IconShuffle />
         </button>

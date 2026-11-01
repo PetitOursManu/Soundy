@@ -312,6 +312,17 @@ const fr = {
   'downloads.queuedMany': '{n} titres ajoutés aux téléchargements',
   'downloads.queuedOne': 'Téléchargement de « {title} »',
 
+  // --- Favoris -------------------------------------------------------------
+  'fav.add': 'Ajouter aux favoris',
+  'fav.remove': 'Retirer des favoris',
+  'fav.added': 'Ajouté aux favoris ❤',
+  'fav.removed': 'Retiré des favoris',
+  'fav.error': 'Impossible de modifier les favoris',
+  'fav.filter': 'Favoris',
+  'fav.emptyTitle': 'Aucun favori',
+  'fav.emptyAlbums': "Touchez le ❤ d'un album pour le retrouver ici.",
+  'fav.emptyTracks': "Touchez le ❤ d'un titre (dans la roue, le lecteur ou son menu) pour le retrouver ici.",
+
   // --- Erreurs globales ----------------------------------------------------
   'error.newVersion': 'Nouvelle version disponible',
   'error.oops': 'Oups, un problème est survenu',

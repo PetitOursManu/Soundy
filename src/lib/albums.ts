@@ -50,6 +50,7 @@ export function mergeAlbums(list: Album[]): Album[] {
       // On garde le nom d'artiste le plus simple (« Ed Sheeran » plutôt que « Ed Sheeran feat. … »)
       if (a.artist.length < target.artist.length) target.artist = a.artist;
       if (!target.year && a.year) target.year = a.year;
+      if (a.favorite) target.favorite = true;
     } else {
       const copy: Album = { ...a, ids: [a.id] };
       group.push(copy);

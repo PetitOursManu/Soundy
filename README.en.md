@@ -69,6 +69,7 @@
 | 📥 Downloads | On every album / track, or **several albums at once** (*Select* button or long press). **A downloaded track is always played from the device first**, even when online. Storage used and deletion in Settings. |
 | 💿 Library | **Albums by default**, sorted **by artist then alphabetically**, or a **track-by-track** view. Albums "split" by Emby (different album artist from one track to another) are **merged automatically**. |
 | 🎡 Wheel navigation | In an album and in the Tracks view, songs scroll along a circle and the centred track is highlighted. **Desktop**: mouse wheel / trackpad, arrow keys, Page ↑/↓, Home/End, Enter. **Mobile**: swipe. Track menu: right-click / long press. |
+| ❤ Favorites | By **track** and by **album** (❤ on the album page, in the wheel, the player and a track's menu); **"Favorites"** filter in the library. These are your **Emby** favorites: synced with your other devices and Emby apps. |
 | 🔍 Search | By **album**, **track** and **artist** (All / Albums / Tracks filters), recent searches. |
 | 🎧 Bluetooth | Bluetooth headphones / speakers, name of the connected device (Android), output selection (browser), headset / car buttons. **Screen-off playback** with a control notification (Android). |
 | 📳 Vibrations | Gentle haptic feedback when scrolling through tracks and on buttons (can be turned off). |
@@ -85,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.4.0** | **Favorites** by track and by album (synced with Emby), "Favorites" filter in the library (albums and tracks). |
 | **1.3.0** | **English version** of the app: language picker on first launch, in Settings and on the sign-in screen (interface, Android notification, server error messages). English README. |
 | **1.2.2** | New logo (icons, splash screen, header). Touch scrolling restored when the finger starts on an album card. |
 | **1.2.1** | No more stretch / bounce effect at the top and bottom of pages. |
