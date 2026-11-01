@@ -6,10 +6,11 @@ Il fonctionne dans le navigateur (application web installable / PWA) et sur **An
 | Fonction | Détail |
 |---|---|
 | 🎵 Streaming Emby | Lecture à distance de toute la bibliothèque musicale Emby (qualité réglable). |
-| 📥 Téléchargement | Albums ou titres enregistrés sur l'appareil. **Un titre téléchargé est toujours lu en local en priorité**, même connecté. Mode hors ligne automatique. |
+| 📥 Téléchargement | Bouton de téléchargement sur chaque album / titre. **Un titre téléchargé est toujours lu depuis l'appareil en priorité**, même connecté. Espace utilisé et suppression dans les Réglages. |
 | 🎧 Bluetooth | Sortie vers casque / enceinte Bluetooth, détection de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque/de la voiture (lecture, pause, suivant, précédent). |
 | 💿 Bibliothèque | Classement **par album par défaut**, ou **titre par titre**. Tri A→Z, artiste, ajouts récents, année. |
-| 🔍 Recherche | Par **album** et par **titre** (filtres Tout / Albums / Titres), recherches récentes, recherche hors ligne dans les téléchargements. |
+| 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent le long d'un arc, le titre centré est mis en avant. **PC** : molette / trackpad, flèches ↑ ↓, Page ↑/↓, Début/Fin, Entrée pour lire. **Mobile** : glisser au doigt. |
+| 🔍 Recherche | Par **album** et par **titre** (filtres Tout / Albums / Titres), recherches récentes. |
 | 📨 Demandes | Onglet pour demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres**. L'admin les valide / refuse avec un message. Notification Discord/Slack/Gotify possible. |
 | 🌗 Thème | Clair, sombre ou automatique. |
 
@@ -42,7 +43,8 @@ src/
   store/downloads.ts   Gestionnaire de téléchargements (file, progression, stockage)
   lib/db.ts            Stockage IndexedDB (audio, pochettes, métadonnées)
   lib/nativeBridge.ts  Liaison avec le service Android (notification, boutons Bluetooth)
-  pages/               Bibliothèque, Album, Lecteur, Recherche, Hors ligne, Demandes, Réglages
+  components/TrackWheel.tsx  Navigation en roue (molette, clavier, glisser)
+  pages/               Bibliothèque, Album, Lecteur, Recherche, Demandes, Réglages
   styles/global.css    Design system neumorphique (thèmes clair / sombre)
 server/index.js        Serveur Soundy (Express)
 android/               Projet Android (Capacitor) + plugin natif SoundyAudio
@@ -50,7 +52,24 @@ android/               Projet Android (Capacitor) + plugin natif SoundyAudio
 
 ---
 
-## 🚀 Installation (Docker, recommandé)
+## ☁️ Installation sur Coolify
+
+1. **+ New → Resource → Private Repository (with GitHub App)** (ou *Public Repository*), choisissez le dépôt `Soundy`, branche **`main`**.
+2. **Build Pack** : `Dockerfile` (le `Dockerfile` à la racine est détecté).
+3. **Ports Exposes** : `8080`.
+4. **Domains** : par exemple `https://soundy.mondomaine.fr` (Coolify génère le certificat HTTPS).
+5. **Environment Variables** :
+   - `EMBY_URL` = adresse de votre Emby, ex. `https://emby.mondomaine.fr` (ou `http://emby:8096` si Emby est sur le même réseau Docker) — **obligatoire** ;
+   - facultatif : `WEBHOOK_URL`, `EMBY_PROXY=true`, `MAX_PENDING` ;
+   - facultatif, en **Build Variable** : `VITE_EMBY_URL` pour pré-remplir l'adresse Emby sur l'écran de connexion.
+6. **Storages** → *Add* → volume monté sur **`/data`** (conserve les demandes entre les déploiements).
+7. **Health Check** (facultatif) : chemin `/api/health`, port `8080`.
+8. **Deploy**, puis ouvrez le domaine et connectez-vous avec un compte Emby.
+
+> Avec Coolify, l'application web et l'API des demandes sont sur le même domaine : rien à régler dans
+> *Réglages → Serveur de demandes* côté web. Pour l'APK Android, renseignez `https://soundy.mondomaine.fr`.
+
+## 🚀 Installation (Docker Compose)
 
 Sur la machine qui héberge Emby (ou une autre) :
 

@@ -7,13 +7,13 @@ import Library from './pages/Library';
 import Login from './pages/Login';
 import { useAuth } from './store/auth';
 import { useDownloads } from './store/downloads';
+import { usePlayer } from './store/player';
 import { useSettings } from './store/settings';
 import { toast } from './store/toast';
 import { EmbyError } from './api/emby';
 
 const AlbumPage = lazy(() => import('./pages/AlbumPage'));
 const Search = lazy(() => import('./pages/Search'));
-const Downloads = lazy(() => import('./pages/Downloads'));
 const Requests = lazy(() => import('./pages/Requests'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Player = lazy(() => import('./pages/Player'));
@@ -38,6 +38,7 @@ function useTheme() {
 function Shell() {
   const location = useLocation();
   const onPlayer = location.pathname === '/player';
+  const hasMini = usePlayer((s) => s.queue.length > 0);
 
   // Remonte en haut à chaque changement de page (sauf retour arrière géré par la page)
   useEffect(() => {
@@ -45,13 +46,12 @@ function Shell() {
   }, [location.pathname, onPlayer]);
 
   return (
-    <>
+    <div className={hasMini ? 'has-mini' : ''}>
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<Library />} />
           <Route path="/album/:id" element={<AlbumPage />} />
           <Route path="/search" element={<Search />} />
-          <Route path="/downloads" element={<Downloads />} />
           <Route path="/requests" element={<Requests />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/player" element={<Player />} />
@@ -64,7 +64,7 @@ function Shell() {
           <BottomNav />
         </>
       )}
-    </>
+    </div>
   );
 }
 

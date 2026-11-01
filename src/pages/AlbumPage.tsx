@@ -6,7 +6,7 @@ import { Empty } from '../components/Empty';
 import { IconAlert, IconBack, IconDownload, IconDownloaded, IconMore, IconPlay, IconPlayNext, IconQueue, IconShuffle, IconTrash, IconX } from '../components/Icons';
 import { ProgressRing } from '../components/ProgressRing';
 import { MenuItem, Sheet } from '../components/Sheet';
-import { TrackRow } from '../components/TrackRow';
+import { TrackWheel } from '../components/TrackWheel';
 import { formatDuration, plural } from '../lib/format';
 import { useAuth } from '../store/auth';
 import { useDownloadState, useDownloads } from '../store/downloads';
@@ -89,8 +89,8 @@ export default function AlbumPage() {
   }
 
   return (
-    <div className="page">
-      <header className="page-header">
+    <div className="page page-fill">
+      <header className="page-header" style={{ marginBottom: 16 }}>
         <button className="icon-btn" onClick={back} aria-label="Retour">
           <IconBack />
         </button>
@@ -102,77 +102,66 @@ export default function AlbumPage() {
         </button>
       </header>
 
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-        <div className="cover-ring" style={{ width: 'min(62vw, 250px)', aspectRatio: '1', padding: 12, boxShadow: 'var(--neu-xl)' }}>
+      <div className="album-head">
+        <div className="cover-ring">
           <Cover
             imageId={info?.coverId ?? (info?.imageTag ? info.id : first?.imageId)}
             tag={info?.imageTag ?? first?.imageTag}
-            size={600}
+            size={400}
             style={{ width: '100%', height: '100%' }}
             alt={info?.title}
           />
         </div>
-        <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 26, letterSpacing: '-0.02em' }}>{info?.title ?? '…'}</h1>
-        <p className="muted" style={{ marginTop: 6, fontSize: 15 }}>
-          {info?.artist}
-        </p>
-        {list.length > 0 && (
-          <p style={{ marginTop: 6, fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
-            {[info?.year, plural(list.length, 'titre'), formatDuration(totalDuration)].filter(Boolean).join(' · ')}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <h1 className="ellipsis">{info?.title ?? '…'}</h1>
+          <p className="muted ellipsis" style={{ marginTop: 4, fontSize: 14.5 }}>
+            {info?.artist}
           </p>
-        )}
-
-        <div className="row" style={{ marginTop: 24, gap: 16, justifyContent: 'center' }}>
-          <button className="icon-btn" onClick={() => playQueue(list, 0, { shuffle: true })} disabled={!list.length} aria-label="Lecture aléatoire">
-            <IconShuffle />
-          </button>
-          <button className="btn accent" onClick={() => playQueue(list, 0, { shuffle: false })} disabled={!list.length} style={{ minWidth: 150 }}>
-            <IconPlay /> Lire
-          </button>
-          <button
-            className={`icon-btn ${fullyDownloaded ? 'active' : ''}`}
-            onClick={toggleDownload}
-            disabled={!list.length || (!online && !fullyDownloaded)}
-            aria-label={fullyDownloaded ? 'Album téléchargé' : dl.pending ? 'Annuler le téléchargement' : "Télécharger l'album"}
-          >
-            {dl.pending ? (
-              <ProgressRing value={dl.progress} />
-            ) : fullyDownloaded ? (
-              <IconDownloaded style={{ color: 'var(--success)' }} />
-            ) : (
-              <IconDownload />
-            )}
-          </button>
+          {list.length > 0 && (
+            <p style={{ marginTop: 4, fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600 }}>
+              {[info?.year, plural(list.length, 'titre'), formatDuration(totalDuration)].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
-        {dl.done > 0 && dl.done < dl.total && !dl.pending && (
-          <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-            {dl.done} / {dl.total} titres disponibles hors ligne
-          </p>
-        )}
       </div>
 
-      <div className="track-list" style={{ marginTop: 30 }}>
-        {loading &&
-          Array.from({ length: album?.trackCount ?? 8 }, (_, i) => (
-            <div key={i} className="track-row">
-              <span className="num">{i + 1}</span>
-              <div className="info">
-                <div className="skeleton" style={{ height: 12, width: '55%', marginBottom: 8 }} />
-                <div className="skeleton" style={{ height: 10, width: '30%' }} />
-              </div>
-            </div>
-          ))}
-        {list.map((t, i) => (
-          <div key={t.id}>
-            {multiDisc && (i === 0 || (list[i - 1].disc ?? 1) !== (t.disc ?? 1)) && (
-              <div className="section-title" style={{ marginTop: i === 0 ? 0 : 20 }}>
-                Disque {t.disc ?? 1}
-              </div>
-            )}
-            <TrackRow track={t} number={t.index ?? i + 1} showCover={false} onPlay={() => playQueue(list, i, { shuffle: false })} />
-          </div>
-        ))}
+      <div className="row" style={{ gap: 14, margin: '14px 0 4px' }}>
+        <button className="btn accent sm" onClick={() => playQueue(list, 0, { shuffle: false })} disabled={!list.length} style={{ height: 46, flex: 1 }}>
+          <IconPlay /> Lire l'album
+        </button>
+        <button className="icon-btn" onClick={() => playQueue(list, 0, { shuffle: true })} disabled={!list.length} aria-label="Lecture aléatoire">
+          <IconShuffle />
+        </button>
+        <button
+          className={`icon-btn ${fullyDownloaded ? 'active' : ''}`}
+          onClick={toggleDownload}
+          disabled={!list.length || (!online && !fullyDownloaded)}
+          aria-label={fullyDownloaded ? 'Album téléchargé' : dl.pending ? 'Annuler le téléchargement' : "Télécharger l'album"}
+          title={dl.done > 0 && dl.done < dl.total && !dl.pending ? `${dl.done} / ${dl.total} titres téléchargés` : undefined}
+        >
+          {dl.pending ? (
+            <ProgressRing value={dl.progress} />
+          ) : fullyDownloaded ? (
+            <IconDownloaded style={{ color: 'var(--success)' }} />
+          ) : (
+            <IconDownload />
+          )}
+        </button>
       </div>
+
+      {list.length > 0 ? (
+        <div className="wheel-area">
+          <TrackWheel tracks={list} mode="album" multiDisc={multiDisc} label="Titres de l'album" onPlay={(i) => playQueue(list, i, { shuffle: false })} />
+        </div>
+      ) : (
+        loading && (
+          <div className="wheel-area" aria-hidden>
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+              <span className="loader" style={{ color: 'var(--text-3)' }} />
+            </div>
+          </div>
+        )
+      )}
 
       <Sheet open={menu} onClose={() => setMenu(false)} title={info?.title} description={info?.artist}>
         <MenuItem

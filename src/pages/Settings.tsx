@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_VERSION } from '../api/emby';
 import { IconBack, IconLogout, IconServer } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
+import { formatBytes, plural } from '../lib/format';
 import { clearPagedCache } from '../lib/hooks';
 import { isNative } from '../lib/native';
 import { useAuth } from '../store/auth';
+import { useDownloads } from '../store/downloads';
 import { usePlayer } from '../store/player';
 import { BITRATES, DownloadQuality, Theme, useSettings } from '../store/settings';
 import { toast } from '../store/toast';
@@ -19,6 +21,19 @@ export default function Settings() {
   const [requestsUrl, setRequestsUrl] = useState(settings.requestsUrl);
   const [testing, setTesting] = useState(false);
   const [confirm, setConfirm] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const downloaded = useDownloads((s) => s.downloaded);
+  const pending = useDownloads((s) => s.tasks.length);
+  const dlCount = Object.keys(downloaded).length;
+  const dlSize = Object.values(downloaded).reduce((n, t) => n + t.size, 0);
+  const [free, setFree] = useState<number | null>(null);
+
+  useEffect(() => {
+    navigator.storage
+      ?.estimate?.()
+      .then((e) => e.quota && setFree(Math.max(0, e.quota - (e.usage ?? 0))))
+      .catch(() => {});
+  }, [dlSize]);
 
   const testRequests = async () => {
     const base = requestsUrl.trim().replace(/\/+$/, '');
@@ -111,6 +126,23 @@ export default function Settings() {
             <option value="mp3">MP3 320 kb/s (plus léger, compatible partout)</option>
           </select>
         </div>
+        <div className="row" style={{ marginTop: 18, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
+            <strong>
+              {plural(dlCount, 'titre')} · {formatBytes(dlSize)}
+            </strong>
+            <div className="muted" style={{ fontSize: 12.5 }}>
+              {pending > 0 ? `${pending} en cours de téléchargement · ` : ''}
+              {free !== null ? `${formatBytes(free)} libres sur l'appareil` : 'Stockés sur cet appareil'}
+            </div>
+          </div>
+          <button className="btn sm danger" disabled={!dlCount && !pending} onClick={() => setConfirmClear(true)}>
+            Tout supprimer
+          </button>
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 12, padding: '0 2px' }}>
+          Les titres téléchargés sont toujours lus depuis l'appareil en priorité. Pour télécharger, utilisez l'icône ⤓ d'un album ou le menu ⋯ d'un titre.
+        </p>
       </div>
 
       <div className="section-title">Serveur de demandes</div>
@@ -145,6 +177,28 @@ export default function Settings() {
       <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 24 }}>
         Soundy v{APP_VERSION}
       </p>
+
+      <Sheet
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title="Supprimer les téléchargements ?"
+        description={`${plural(dlCount, 'titre')} (${formatBytes(dlSize)}) seront retirés de cet appareil. Ils restent disponibles en streaming.`}
+      >
+        <div className="row" style={{ gap: 14 }}>
+          <button className="btn block" onClick={() => setConfirmClear(false)}>
+            Annuler
+          </button>
+          <button
+            className="btn block danger"
+            onClick={() => {
+              void useDownloads.getState().clear();
+              setConfirmClear(false);
+            }}
+          >
+            Supprimer
+          </button>
+        </div>
+      </Sheet>
 
       <Sheet
         open={confirm}

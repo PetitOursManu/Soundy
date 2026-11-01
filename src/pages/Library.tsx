@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Album, SortKey, Track } from '../api/emby';
 import { AlbumCard, AlbumCardSkeleton } from '../components/AlbumCard';
 import { Empty } from '../components/Empty';
 import { IconAlert, IconCloudOff, IconDisc, IconList, IconSettings, IconShuffle } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
-import { TrackRow } from '../components/TrackRow';
+import { TrackWheel } from '../components/TrackWheel';
 import { usePaged, useScrollRestore, useSentinel } from '../lib/hooks';
 import { useAuth } from '../store/auth';
 import { useDownloads } from '../store/downloads';
@@ -78,8 +78,13 @@ export default function Library() {
     client!.getTracks({ start, sort, signal }),
   );
   const list = view === 'albums' ? albums : tracks;
-  const sentinel = useSentinel(list.loadMore, online && !list.done && !list.error, `${view}-${sort}-${list.items.length}`);
-  useScrollRestore(`library-${view}-${sort}`, list.items.length > 0);
+  const sentinel = useSentinel(albums.loadMore, online && view === 'albums' && !albums.done && !albums.error, `${sort}-${albums.items.length}`);
+  useScrollRestore(`library-albums-${sort}`, view === 'albums' && albums.items.length > 0);
+
+  // Vue Titres : premier chargement (la suite est chargée par la roue)
+  useEffect(() => {
+    if (online && view === 'tracks' && !tracks.items.length && !tracks.done && !tracks.loading && !tracks.error) void tracks.loadMore();
+  }, [online, view, tracks]);
 
   // Albums dont au moins un titre est téléchargé (badge)
   const downloadedAlbums = useMemo(() => new Set(Object.values(downloaded).map((t) => t.albumId)), [downloaded]);
@@ -102,7 +107,7 @@ export default function Library() {
   const hello = hour < 6 ? 'Bonne nuit' : hour < 18 ? 'Bonjour' : 'Bonsoir';
 
   return (
-    <div className="page">
+    <div className={`page ${view === 'tracks' ? 'page-fill' : ''}`}>
       <header className="page-header">
         <div style={{ minWidth: 0 }}>
           <p className="page-subtitle">
@@ -152,7 +157,7 @@ export default function Library() {
         </div>
       )}
 
-      <div style={{ marginTop: online ? 8 : 24 }}>
+      <div style={{ marginTop: online ? 8 : 24, ...(view === 'tracks' ? { flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 } : {}) }}>
         {online ? (
           view === 'albums' ? (
             <div className="album-grid">
@@ -162,21 +167,21 @@ export default function Library() {
               {albums.loading && Array.from({ length: albums.items.length ? 2 : 6 }, (_, i) => <AlbumCardSkeleton key={`sk${i}`} />)}
             </div>
           ) : (
-            <div className="track-list">
-              {tracks.items.map((t, i) => (
-                <TrackRow key={t.id} track={t} showAlbum onPlay={() => playQueue(tracks.items, i)} />
-              ))}
-              {tracks.loading &&
-                Array.from({ length: 6 }, (_, i) => (
-                  <div key={`sk${i}`} className="track-row">
-                    <div className="skeleton" style={{ width: 50, height: 50, borderRadius: '50%' }} />
-                    <div className="info">
-                      <div className="skeleton" style={{ height: 12, width: '60%', marginBottom: 8 }} />
-                      <div className="skeleton" style={{ height: 10, width: '35%' }} />
-                    </div>
-                  </div>
-                ))}
-            </div>
+            tracks.items.length > 0 ? (
+              <div className="wheel-area">
+                <TrackWheel
+                  key={sort}
+                  tracks={tracks.items}
+                  total={tracks.total}
+                  mode="tracks"
+                  storageKey={`tracks-${sort}`}
+                  onPlay={(i) => playQueue(tracks.items, i, { shuffle: false })}
+                  onNearEnd={tracks.loadMore}
+                />
+              </div>
+            ) : (
+              tracks.loading && <WheelSkeleton />
+            )
           )
         ) : (
           <OfflineLibrary view={view} />
@@ -192,7 +197,7 @@ export default function Library() {
         {online && list.done && !list.items.length && !list.error && (
           <Empty icon={<IconDisc />} title="Bibliothèque vide" text="Aucune musique n'a été trouvée sur le serveur Emby." />
         )}
-        <div ref={sentinel} className="sentinel" />
+        {view === 'albums' && <div ref={sentinel} className="sentinel" />}
       </div>
     </div>
   );
@@ -224,10 +229,26 @@ function OfflineLibrary({ view }: { view: View }) {
     );
   }
   return (
-    <div className="track-list">
-      {all.map((t, i) => (
-        <TrackRow key={t.id} track={t} showAlbum onPlay={() => playQueue(all, i)} />
-      ))}
+    <div className="wheel-area">
+      <TrackWheel tracks={all} mode="tracks" storageKey="tracks-offline" onPlay={(i) => playQueue(all, i, { shuffle: false })} />
+    </div>
+  );
+}
+
+function WheelSkeleton() {
+  return (
+    <div className="wheel-area" aria-hidden>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 26, padding: '0 34px' }}>
+        {[0.45, 1, 0.45].map((o, i) => (
+          <div key={i} className="row" style={{ opacity: o, gap: 16 }}>
+            <div className="skeleton" style={{ width: 64, height: 64, borderRadius: '50%' }} />
+            <div style={{ flex: 1 }}>
+              <div className="skeleton" style={{ height: 14, width: '55%', marginBottom: 8 }} />
+              <div className="skeleton" style={{ height: 10, width: '30%' }} />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
