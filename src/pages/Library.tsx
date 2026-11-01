@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Album, SortKey, Track } from '../api/emby';
 import { AlbumCard, AlbumCardSkeleton } from '../components/AlbumCard';
+import { Brand } from '../components/Brand';
 import { Empty } from '../components/Empty';
 import { IconAlert, IconCloudOff, IconDisc, IconList, IconSettings, IconShuffle } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
@@ -57,7 +58,6 @@ export default function Library() {
   const view: View = params.get('view') === 'tracks' ? 'tracks' : 'albums';
   const [sort, setSort] = useState<SortKey>(() => (sessionStorage.getItem(`sort:${view}`) as SortKey) || 'name');
   const client = useAuth((s) => s.client);
-  const session = useAuth((s) => s.session);
   const online = useNetwork((s) => s.online);
   const downloaded = useDownloads((s) => s.downloaded);
   const playQueue = usePlayer((s) => s.playQueue);
@@ -103,18 +103,14 @@ export default function Library() {
     }
   };
 
-  const hour = new Date().getHours();
-  const hello = hour < 6 ? 'Bonne nuit' : hour < 18 ? 'Bonjour' : 'Bonsoir';
 
   return (
     <div className={`page ${view === 'tracks' ? 'page-fill' : ''}`}>
       <header className="page-header">
-        <div style={{ minWidth: 0 }}>
-          <p className="page-subtitle">
-            {hello} {session?.userName} 👋
-          </p>
-          <h1 className="page-title">Bibliothèque</h1>
-        </div>
+        <h1 style={{ margin: 0 }}>
+          <Brand size={46} />
+          <span className="sr-only">Bibliothèque</span>
+        </h1>
         <div className="row" style={{ gap: 14 }}>
           <button className="icon-btn" onClick={shuffleAll} aria-label="Lecture aléatoire">
             <IconShuffle />

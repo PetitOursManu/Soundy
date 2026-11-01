@@ -1,6 +1,6 @@
 # Compile automatiquement l'application Android (APK) à chaque push.
-# L'APK est téléchargeable dans l'onglet « Actions » du dépôt → dernier
-# workflow → section « Artifacts ».
+# - Push classique : APK téléchargeable dans l'onglet « Actions » → « Artifacts ».
+# - Étiquette de version (ex. v1.0.0) : une Release GitHub est créée avec l'APK.
 name: Android APK
 
 on:
@@ -8,6 +8,9 @@ on:
     branches: ['**']
     tags: ['v*']
   workflow_dispatch:
+
+permissions:
+  contents: write # nécessaire pour publier la Release
 
 jobs:
   build:
@@ -49,3 +52,23 @@ jobs:
           name: soundy-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Nom de l'APK publié
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-${GITHUB_REF_NAME}.apk"
+
+      - name: Publication de la Release GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Soundy ${{ github.ref_name }}
+          files: Soundy-${{ github.ref_name }}.apk
+          body: |
+            ## 📱 Installer Soundy sur Android
+            1. Téléchargez **Soundy-${{ github.ref_name }}.apk** ci-dessous depuis votre téléphone.
+            2. Ouvrez le fichier et autorisez l'installation depuis cette source si Android le demande.
+            3. Connectez-vous avec votre compte Emby, puis indiquez l'adresse de votre serveur Soundy
+               dans *Réglages → Serveur de demandes* (pour l'onglet Demandes).
+
+            > APK signé avec une clé de développement : pour une mise à jour, il peut être nécessaire
+            > de désinstaller la version précédente.
