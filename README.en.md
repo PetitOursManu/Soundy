@@ -73,7 +73,7 @@
 | 🔍 Search | By **album**, **track** and **artist** (All / Albums / Tracks filters), recent searches. |
 | 🎧 Bluetooth | Bluetooth headphones / speakers, name of the connected device (Android), output selection (browser), headset / car buttons. **Screen-off playback** with a control notification (Android). |
 | 📳 Vibrations | Gentle haptic feedback when scrolling through tracks and on buttons (can be turned off). |
-| 📨 Requests | Ask the admin to add **a whole album** or **several tracks**; the admin approves / declines with a message. Discord / Slack / Gotify notification available. |
+| 📨 Requests | Ask the admin to add **a whole album** or **several tracks**; the admin approves / declines with a message. The admin can be **notified on their phone** (ntfy, Discord, Gotify… — [see the guide](#notifications)). |
 | 🌍 Languages | **French and English**, chosen on first launch, changeable in Settings and on the sign-in screen. |
 | 🌗 Theme | Light, dark or automatic, neumorphic style. |
 | 🔄 Updates | Automatic GitHub release for each new version; the APK installs **over** the previous one (downloads are kept). |
@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.4.1** | Simpler request notifications: service detected automatically (ntfy, Discord, Gotify, Slack), test button in Settings (admin), guide in the README. |
 | **1.4.0** | **Favorites** by track and by album (synced with Emby), "Favorites" filter in the library (albums and tracks). |
 | **1.3.0** | **English version** of the app: language picker on first launch, in Settings and on the sign-in screen (interface, Android notification, server error messages). English README. |
 | **1.2.2** | New logo (icons, splash screen, header). Touch scrolling restored when the finger starts on an album card. |
@@ -163,7 +164,7 @@ android/               Android project (Capacitor) + native SoundyAudio plugin
 4. **Domains**: for example `https://soundy.mydomain.com` (Coolify issues the HTTPS certificate).
 5. **Environment Variables**:
    - `EMBY_URL` = your Emby address, e.g. `https://emby.mydomain.com` (or `http://emby:8096` if Emby is on the same Docker network) — **required**;
-   - optional: `WEBHOOK_URL`, `EMBY_PROXY=true`, `MAX_PENDING`;
+   - optional: `WEBHOOK_URL` (notifications, see [below](#notifications)), `EMBY_PROXY=true`, `MAX_PENDING`;
    - optional, as a **Build Variable**: `VITE_EMBY_URL` to pre-fill the Emby address on the sign-in screen.
 6. **Storages** → *Add* → volume mounted on **`/data`** (keeps requests across deployments).
 7. **Health Check** (optional): path `/api/health`, port `8080`.
@@ -198,7 +199,9 @@ Put it behind your HTTPS reverse proxy (Nginx Proxy Manager, Traefik, Caddy…),
 | `PORT` | | Listening port (default `8080`). |
 | `DATA_DIR` | | Requests folder (default `/data` in Docker). |
 | `CORS_ORIGINS` | | Allowed origins (default `*`, needed for the Android app). |
-| `WEBHOOK_URL` | | URL called for each new request (Discord, Slack, Mattermost, Gotify…). |
+| `WEBHOOK_URL` | | Notification for each new request: ntfy, Discord, Gotify, Slack… — see [Notifications](#notifications). |
+| `WEBHOOK_TYPE` | | Forces the notification format (`discord`, `ntfy`, `gotify`, `slack`, `json`). |
+| `NOTIFY_LANG` | | Notification language: `fr` (default) or `en`. |
 | `EMBY_PROXY` | | `true` to expose Emby through `https://soundy.mydomain.com/emby` (see troubleshooting). |
 | `MAX_PENDING` | | Maximum number of pending requests per user (default `20`). |
 
@@ -209,6 +212,45 @@ npm install
 npm run build
 EMBY_URL=http://localhost:8096 node server/index.js
 ```
+
+---
+
+<a id="notifications"></a>
+
+## 🔔 New request notifications
+
+When a user sends a music request, the Soundy server can **notify the administrator** (on their phone,
+Discord…). It is **off by default**: just set the **`WEBHOOK_URL`** variable on the Soundy server. The
+service is **detected automatically** from the address.
+
+**Setup (3 steps)**
+
+1. Pick a service below and get its address.
+2. In **Coolify** → your Soundy application → **Environment Variables** → add `WEBHOOK_URL` = that address,
+   then **Redeploy** (with Docker Compose: uncomment `WEBHOOK_URL` in `docker-compose.yml`).
+3. In Soundy, signed in with an administrator account: **Settings → Request notifications → Send a test
+   notification**. The section shows "Enabled · *service*" and the test message should arrive.
+
+| Service | How to get the address | `WEBHOOK_URL` example |
+|---|---|---|
+| **ntfy** *(easiest, phone notification, free)* | Install the **ntfy** app (Android / iOS), tap **+** and subscribe to a topic with a **hard-to-guess** name (topics on ntfy.sh are public). Also works with a self-hosted ntfy server. | `https://ntfy.sh/soundy-requests-k7x9q2` |
+| **Discord** | On your Discord server: **Edit channel → Integrations → Webhooks → New webhook → Copy webhook URL**. | `https://discord.com/api/webhooks/123…/AbC…` |
+| **Gotify** *(self-hosted)* | Gotify interface → **Apps → Create Application** → copy the **token**. | `https://gotify.mydomain.com/message?token=AbCdEf` |
+| **Slack / Mattermost** | Create an **Incoming Webhook** in the workspace administration. | `https://hooks.slack.com/services/T…/B…/x…` |
+| Other | Soundy sends a JSON `{ title, message, text, content }`. | `https://my-service/hook` |
+
+**Options**
+
+| Variable | Purpose |
+|---|---|
+| `WEBHOOK_TYPE` | Forces the format if auto-detection is wrong: `discord`, `ntfy`, `gotify`, `slack` or `json`. |
+| `NOTIFY_LANG` | Notification language: `fr` (default) or `en` — set `en` for English notifications. |
+
+Example of a received notification: **🎵 New Soundy request** — *Mary asks for the album “Random Access Memories” by Daft Punk*.
+
+> If sending fails, the test button shows why (e.g. `HTTP 401` = wrong address or token).
+> Not to be confused with the Android app's **"Now playing" notification**: that one is automatic and needs
+> no setup.
 
 ---
 

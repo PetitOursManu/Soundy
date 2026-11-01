@@ -13,8 +13,12 @@ services:
       EMBY_URL: "http://emby:8096"
       # Origines autorisées à appeler l'API des demandes (* = toutes, nécessaire pour l'app Android)
       CORS_ORIGINS: "*"
-      # Notification à chaque nouvelle demande (Discord, Slack, Gotify, ntfy…) — facultatif
-      # WEBHOOK_URL: "https://discord.com/api/webhooks/xxxx/yyyy"
+      # Notification à chaque nouvelle demande — facultatif (voir README › Notifications)
+      #   ntfy    : https://ntfy.sh/un-sujet-difficile-a-deviner
+      #   Discord : https://discord.com/api/webhooks/xxxx/yyyy
+      #   Gotify  : https://gotify.mondomaine.fr/message?token=xxxx
+      # WEBHOOK_URL: "https://ntfy.sh/soundy-demandes-k7x9q2"
+      # NOTIFY_LANG: "fr"
       # Proxy /emby → EMBY_URL, utile si votre Emby refuse les requêtes CORS — facultatif
       # EMBY_PROXY: "true"
     volumes:

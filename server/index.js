@@ -9,8 +9,10 @@
 //   PORT          Port d'écoute (défaut 8080)
 //   DATA_DIR      Dossier de stockage des demandes (défaut ./data)
 //   CORS_ORIGINS  Origines autorisées, séparées par des virgules (défaut *)
-//   WEBHOOK_URL   (option) Webhook notifié à chaque nouvelle demande
-//                 (compatible Discord, Slack, ntfy, Gotify…)
+//   WEBHOOK_URL   (option) Notification à chaque nouvelle demande : Discord, ntfy,
+//                 Gotify, Slack, Mattermost… (service détecté d'après l'adresse)
+//   WEBHOOK_TYPE  (option) Force le format : discord | slack | gotify | ntfy | json
+//   NOTIFY_LANG   (option) Langue des notifications : fr (défaut) | en
 //   EMBY_PROXY    (option) "true" pour activer le proxy /emby → EMBY_URL
 //   MAX_PENDING   Nombre max de demandes en attente par utilisateur (défaut 20)
 // ============================================================================
@@ -55,6 +57,8 @@ const MESSAGES = {
   badStatus: ['Statut invalide.', 'Invalid status.'],
   forbidden: ['Action non autorisée.', 'Action not allowed.'],
   unknownRoute: ['Route inconnue.', 'Unknown route.'],
+  webhookMissing: ["Aucune notification configurée : renseignez la variable WEBHOOK_URL du serveur Soundy.", 'No notification configured: set the WEBHOOK_URL variable on the Soundy server.'],
+  webhookFailed: ['Échec de l’envoi ({type}) : {error}. Vérifiez l’adresse WEBHOOK_URL.', 'Sending failed ({type}): {error}. Check the WEBHOOK_URL address.'],
 };
 
 function msg(req, key, vars = {}) {
@@ -134,24 +138,69 @@ async function auth(req, res, next) {
 // ----------------------------------------------------------------------------
 // Notification (webhook)
 // ----------------------------------------------------------------------------
+// Format du message selon le service, détecté d'après l'adresse
+// (forçable avec WEBHOOK_TYPE = discord | slack | gotify | ntfy | json)
+function webhookType(url) {
+  const forced = (process.env.WEBHOOK_TYPE || '').toLowerCase();
+  if (forced) return forced;
+  if (/discord(app)?\.com\/api\/webhooks/i.test(url)) return 'discord';
+  if (/hooks\.slack\.com|\/hooks\//i.test(url)) return 'slack'; // Slack, Mattermost, Rocket.Chat
+  if (/\/message\?token=/i.test(url)) return 'gotify';
+  if (/ntfy/i.test(url)) return 'ntfy';
+  return 'json';
+}
+
+/** Envoie une notification ; renvoie { ok, type, status?, error? }. */
+async function sendWebhook(title, text) {
+  if (!WEBHOOK_URL) return { ok: false, error: 'not-configured' };
+  const type = webhookType(WEBHOOK_URL);
+  let url = WEBHOOK_URL;
+  let init;
+  switch (type) {
+    case 'discord':
+      init = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Soundy', content: `**${title}**\n${text}` }) };
+      break;
+    case 'slack':
+      init = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: `*${title}*\n${text}` }) };
+      break;
+    case 'gotify':
+      init = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, message: text, priority: 5 }) };
+      break;
+    case 'ntfy':
+      // ntfy : le corps est le message ; titre et icône passent dans l'adresse (accents / emojis sûrs)
+      url = `${WEBHOOK_URL}${WEBHOOK_URL.includes('?') ? '&' : '?'}title=${encodeURIComponent(title)}&tags=musical_note`;
+      init = { headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: text };
+      break;
+    default:
+      init = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, message: text, text, content: `${title}\n${text}` }) };
+  }
+  try {
+    const res = await fetch(url, { method: 'POST', ...init, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return { ok: false, type, status: res.status, error: `HTTP ${res.status}` };
+    return { ok: true, type };
+  } catch (e) {
+    return { ok: false, type, error: e.message };
+  }
+}
+
+/** Langue des notifications envoyées à l'administrateur (NOTIFY_LANG = fr | en). */
+const NOTIFY_EN = /^en/i.test(process.env.NOTIFY_LANG || '');
+
 async function notify(r) {
   if (!WEBHOOK_URL) return;
+  const quoted = (x) => (NOTIFY_EN ? `“${x}”` : `« ${x} »`);
   const what =
     r.type === 'album'
-      ? `l’album « ${r.album} » de ${r.artist}`
-      : `${r.tracks.length} titre(s) de ${r.artist} : ${r.tracks.map((t) => `« ${t} »`).join(', ')}`;
-  const text = `🎵 Nouvelle demande Soundy de ${r.userName} : ${what}${r.comment ? `\n💬 ${r.comment}` : ''}`;
-  try {
-    await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // "content" pour Discord, "text" pour Slack/Mattermost, "message" pour Gotify
-      body: JSON.stringify({ content: text, text, message: text, title: 'Soundy' }),
-      signal: AbortSignal.timeout(8000),
-    });
-  } catch (e) {
-    console.warn('Webhook en échec :', e.message);
-  }
+      ? NOTIFY_EN
+        ? `the album ${quoted(r.album)} by ${r.artist}`
+        : `l’album ${quoted(r.album)} de ${r.artist}`
+      : NOTIFY_EN
+        ? `${r.tracks.length} track(s) by ${r.artist}: ${r.tracks.map(quoted).join(', ')}`
+        : `${r.tracks.length} titre(s) de ${r.artist} : ${r.tracks.map(quoted).join(', ')}`;
+  const title = NOTIFY_EN ? '🎵 New Soundy request' : '🎵 Nouvelle demande Soundy';
+  const text = `${r.userName} ${NOTIFY_EN ? 'asks for' : 'demande'} ${what}${r.comment ? `\n💬 ${r.comment}` : ''}`;
+  const result = await sendWebhook(title, text);
+  if (!result.ok) console.warn(`Notification (${result.type}) en échec :`, result.error);
 }
 
 // ----------------------------------------------------------------------------
@@ -196,6 +245,23 @@ app.use('/api', (req, res, next) => {
 app.use('/api', express.json({ limit: '32kb' }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'soundy', emby: !!EMBY_URL }));
+
+// Notification de test (admin) : vérifie le réglage WEBHOOK_URL
+app.post('/api/notify/test', auth, async (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
+  if (!WEBHOOK_URL) return res.status(400).json({ error: msg(req, 'webhookMissing') });
+  const en = /^en/i.test(req.get('Accept-Language') || '');
+  const result = await sendWebhook(
+    en ? '🔔 Soundy notification test' : '🔔 Test de notification Soundy',
+    en ? `It works! New music requests will be sent here. (${req.user.name})` : `Ça fonctionne ! Les nouvelles demandes de musique arriveront ici. (${req.user.name})`,
+  );
+  if (!result.ok) return res.status(502).json({ error: msg(req, 'webhookFailed', { type: result.type, error: result.error }) });
+  res.json({ ok: true, type: result.type });
+});
+
+app.get('/api/notify/status', auth, (req, res) => {
+  res.json({ configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null });
+});
 
 // Liste des demandes : les miennes, ou toutes (admin)
 app.get('/api/requests', auth, (req, res) => {

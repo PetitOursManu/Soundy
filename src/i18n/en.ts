@@ -324,6 +324,17 @@ const en: Record<keyof typeof fr, string> = {
   'fav.emptyAlbums': 'Tap the ❤ of an album to find it here.',
   'fav.emptyTracks': 'Tap the ❤ of a track (in the wheel, the player or its menu) to find it here.',
 
+  // --- Notifications (admin) -----------------------------------------------
+  'notify.section': 'Request notifications',
+  'notify.title': 'Get notified of new requests',
+  'notify.on': 'Enabled · {service}',
+  'notify.off': 'Not configured',
+  'notify.help': 'Set the WEBHOOK_URL variable on the Soundy server (Discord, ntfy, Gotify, Slack…). See the guide in the README.',
+  'notify.test': 'Send a test notification',
+  'notify.sending': 'Sending…',
+  'notify.sent': 'Test notification sent ✓',
+  'notify.unavailable': 'Requests server unreachable',
+
   // --- Global errors -------------------------------------------------------
   'error.newVersion': 'New version available',
   'error.oops': 'Oops, something went wrong',

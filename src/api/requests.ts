@@ -70,6 +70,16 @@ export class RequestsApi {
     return this.call<MusicRequest>(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
   }
 
+  /** Notifications admin : configurées ? pour quel service ? */
+  notifyStatus() {
+    return this.call<{ configured: boolean; type: string | null }>('/notify/status');
+  }
+
+  /** Envoie une notification de test (admin). */
+  notifyTest() {
+    return this.call<{ ok: true; type: string }>('/notify/test', { method: 'POST' });
+  }
+
   remove(id: string) {
     return this.call<{ ok: true }>(`/requests/${id}`, { method: 'DELETE' });
   }

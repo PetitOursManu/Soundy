@@ -73,7 +73,7 @@
 | 🔍 Recherche | Par **album**, par **titre** et par **artiste** (filtres Tout / Albums / Titres), recherches récentes. |
 | 🎧 Bluetooth | Casque / enceinte Bluetooth, nom de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque / de la voiture. Lecture **écran éteint** avec notification de contrôle (Android). |
 | 📳 Vibrations | Petit retour haptique en défilant les titres et sur les boutons (désactivable). |
-| 📨 Demandes | Demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres** ; l'admin les valide / refuse avec un message. Notification Discord / Slack / Gotify possible. |
+| 📨 Demandes | Demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres** ; l'admin les valide / refuse avec un message. L'admin peut être **prévenu sur son téléphone** (ntfy, Discord, Gotify… — [voir le guide](#notifications)). |
 | 🌍 Langues | **Français et anglais**, au choix dès le premier lancement, modifiable dans les Réglages et sur l'écran de connexion. |
 | 🌗 Thème | Clair, sombre ou automatique, style neumorphique. |
 | 🔄 Mises à jour | Release GitHub automatique à chaque nouvelle version ; l'APK s'installe **par-dessus** la précédente (téléchargements conservés). |
@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.4.1** | Notifications des demandes plus simples : service reconnu automatiquement (ntfy, Discord, Gotify, Slack), bouton de test dans les Réglages (admin), guide dans le README. |
 | **1.4.0** | **Favoris** par titre et par album (synchronisés avec Emby), filtre « Favoris » dans la bibliothèque (albums et titres). |
 | **1.3.0** | **Version anglaise** de l'appli : choix de la langue au premier lancement, dans les Réglages et sur l'écran de connexion (interface, notification Android, messages d'erreur du serveur). README en anglais. |
 | **1.2.2** | Nouveau logo (icônes, écran de démarrage, en-tête). Défilement tactile rétabli quand le doigt commence sur une carte d'album. |
@@ -163,7 +164,7 @@ android/               Projet Android (Capacitor) + plugin natif SoundyAudio
 4. **Domains** : par exemple `https://soundy.mondomaine.fr` (Coolify génère le certificat HTTPS).
 5. **Environment Variables** :
    - `EMBY_URL` = adresse de votre Emby, ex. `https://emby.mondomaine.fr` (ou `http://emby:8096` si Emby est sur le même réseau Docker) — **obligatoire** ;
-   - facultatif : `WEBHOOK_URL`, `EMBY_PROXY=true`, `MAX_PENDING` ;
+   - facultatif : `WEBHOOK_URL` (notifications, voir [plus bas](#notifications)), `EMBY_PROXY=true`, `MAX_PENDING` ;
    - facultatif, en **Build Variable** : `VITE_EMBY_URL` pour pré-remplir l'adresse Emby sur l'écran de connexion.
 6. **Storages** → *Add* → volume monté sur **`/data`** (conserve les demandes entre les déploiements).
 7. **Health Check** (facultatif) : chemin `/api/health`, port `8080`.
@@ -198,7 +199,9 @@ Placez-le derrière votre reverse proxy HTTPS (Nginx Proxy Manager, Traefik, Cad
 | `PORT` | | Port d'écoute (défaut `8080`). |
 | `DATA_DIR` | | Dossier des demandes (défaut `/data` dans Docker). |
 | `CORS_ORIGINS` | | Origines autorisées (défaut `*`, nécessaire pour l'application Android). |
-| `WEBHOOK_URL` | | URL appelée à chaque nouvelle demande (Discord, Slack, Mattermost, Gotify…). |
+| `WEBHOOK_URL` | | Notification à chaque nouvelle demande : ntfy, Discord, Gotify, Slack… — voir [Notifications](#notifications). |
+| `WEBHOOK_TYPE` | | Force le format de notification (`discord`, `ntfy`, `gotify`, `slack`, `json`). |
+| `NOTIFY_LANG` | | Langue des notifications : `fr` (défaut) ou `en`. |
 | `EMBY_PROXY` | | `true` pour exposer Emby via `https://soundy.mondomaine.fr/emby` (voir dépannage). |
 | `MAX_PENDING` | | Nombre max de demandes en attente par utilisateur (défaut `20`). |
 
@@ -209,6 +212,45 @@ npm install
 npm run build
 EMBY_URL=http://localhost:8096 node server/index.js
 ```
+
+---
+
+<a id="notifications"></a>
+
+## 🔔 Notifications des nouvelles demandes
+
+Quand un utilisateur envoie une demande d'ajout de musique, le serveur Soundy peut **prévenir l'administrateur**
+(sur son téléphone, Discord…). C'est **désactivé par défaut** : il suffit de renseigner la variable
+**`WEBHOOK_URL`** du serveur Soundy. Le service est **reconnu automatiquement** d'après l'adresse.
+
+**Mise en place (3 étapes)**
+
+1. Choisissez un service ci-dessous et récupérez son adresse.
+2. Dans **Coolify** → votre application Soundy → **Environment Variables** → ajoutez `WEBHOOK_URL` = cette adresse,
+   puis **Redeploy** (avec Docker Compose : décommentez `WEBHOOK_URL` dans `docker-compose.yml`).
+3. Dans Soundy, connecté avec un compte administrateur : **Réglages → Notifications des demandes → Envoyer une
+   notification de test**. La section indique « Activées · *service* » et le message de test doit arriver.
+
+| Service | Comment obtenir l'adresse | Exemple de `WEBHOOK_URL` |
+|---|---|---|
+| **ntfy** *(le plus simple, notification sur le téléphone, gratuit)* | Installez l'appli **ntfy** (Android / iOS), touchez **+** et abonnez-vous à un sujet au nom **difficile à deviner** (sur ntfy.sh les sujets sont publics). Fonctionne aussi avec un serveur ntfy auto-hébergé. | `https://ntfy.sh/soundy-demandes-k7x9q2` |
+| **Discord** | Sur votre serveur Discord : **Paramètres du salon → Intégrations → Webhooks → Nouveau webhook → Copier l'URL du webhook**. | `https://discord.com/api/webhooks/123…/AbC…` |
+| **Gotify** *(auto-hébergé)* | Interface Gotify → **Apps → Create Application** → copiez le **token**. | `https://gotify.mondomaine.fr/message?token=AbCdEf` |
+| **Slack / Mattermost** | Créez un **Incoming Webhook** dans l'administration de l'espace de travail. | `https://hooks.slack.com/services/T…/B…/x…` |
+| Autre | Soundy envoie un JSON `{ title, message, text, content }`. | `https://mon-service/hook` |
+
+**Options**
+
+| Variable | Rôle |
+|---|---|
+| `WEBHOOK_TYPE` | Force le format si la détection automatique se trompe : `discord`, `ntfy`, `gotify`, `slack` ou `json`. |
+| `NOTIFY_LANG` | Langue des notifications : `fr` (défaut) ou `en`. |
+
+Exemple de notification reçue : **🎵 Nouvelle demande Soundy** — *Marie demande l'album « Random Access Memories » de Daft Punk*.
+
+> En cas d'échec, le bouton de test affiche la raison (par ex. `HTTP 401` = adresse ou jeton incorrect).
+> À ne pas confondre avec la **notification « Lecture en cours »** de l'appli Android : celle-ci est automatique
+> et ne demande aucun réglage.
 
 ---
 

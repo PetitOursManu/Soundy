@@ -323,6 +323,17 @@ const fr = {
   'fav.emptyAlbums': "Touchez le ❤ d'un album pour le retrouver ici.",
   'fav.emptyTracks': "Touchez le ❤ d'un titre (dans la roue, le lecteur ou son menu) pour le retrouver ici.",
 
+  // --- Notifications (admin) -----------------------------------------------
+  'notify.section': 'Notifications des demandes',
+  'notify.title': 'Être prévenu des nouvelles demandes',
+  'notify.on': 'Activées · {service}',
+  'notify.off': 'Non configurées',
+  'notify.help': 'Réglez la variable WEBHOOK_URL du serveur Soundy (Discord, ntfy, Gotify, Slack…). Le guide est dans le README.',
+  'notify.test': 'Envoyer une notification de test',
+  'notify.sending': 'Envoi…',
+  'notify.sent': 'Notification de test envoyée ✓',
+  'notify.unavailable': 'Serveur de demandes injoignable',
+
   // --- Erreurs globales ----------------------------------------------------
   'error.newVersion': 'Nouvelle version disponible',
   'error.oops': 'Oups, un problème est survenu',

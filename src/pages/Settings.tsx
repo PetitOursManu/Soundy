@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_VERSION } from '../api/emby';
+import { RequestsApi } from '../api/requests';
 import { Brand } from '../components/Brand';
 import { IconBack, IconLogout, IconServer } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
@@ -175,6 +176,13 @@ export default function Settings() {
         </p>
       </div>
 
+      {session.isAdmin && (
+        <>
+          <div className="section-title">{t('notify.section')}</div>
+          <NotifySettings requestsUrl={settings.requestsUrl} />
+        </>
+      )}
+
       <div className="section-title">{t('settings.requestsServer')}</div>
       <div className="card">
         <div className="field">
@@ -255,6 +263,69 @@ export default function Settings() {
           </button>
         </div>
       </Sheet>
+    </div>
+  );
+}
+
+const SERVICE_NAMES: Record<string, string> = { discord: 'Discord', slack: 'Slack / Mattermost', gotify: 'Gotify', ntfy: 'ntfy', json: 'Webhook' };
+
+/** Administrateurs : état des notifications de demandes + envoi d'un test. */
+function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
+  const { t } = useT();
+  const session = useAuth((s) => s.session)!;
+  const api = useMemo(() => new RequestsApi(requestsUrl, session), [requestsUrl, session]);
+  const [status, setStatus] = useState<{ configured: boolean; type: string | null } | null | 'error'>(null);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    api
+      .notifyStatus()
+      .then((st) => alive && setStatus(st))
+      .catch(() => alive && setStatus('error'));
+    return () => {
+      alive = false;
+    };
+  }, [api]);
+
+  const test = async () => {
+    setSending(true);
+    try {
+      await api.notifyTest();
+      toast(t('notify.sent'), 'success');
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const configured = status !== 'error' && !!status?.configured;
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
+          <strong style={{ fontSize: 15 }}>{t('notify.title')}</strong>
+          <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
+            {status === 'error'
+              ? t('notify.unavailable')
+              : status === null
+                ? '…'
+                : configured
+                  ? t('notify.on', { service: SERVICE_NAMES[status.type ?? 'json'] ?? status.type ?? '' })
+                  : t('notify.off')}
+          </div>
+        </div>
+        <span className={`badge ${configured ? 'added' : 'pending'}`}>{configured ? 'ON' : 'OFF'}</span>
+      </div>
+      {!configured && status !== null && (
+        <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 12 }}>
+          {t('notify.help')}
+        </p>
+      )}
+      <button className="btn sm" style={{ marginTop: 14 }} disabled={!configured || sending} onClick={() => void test()}>
+        {sending ? t('notify.sending') : t('notify.test')}
+      </button>
     </div>
   );
 }
