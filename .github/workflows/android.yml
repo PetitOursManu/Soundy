@@ -64,9 +64,19 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.SOUNDY_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
-            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/soundy.jks"
+            # Tolère les retours à la ligne / espaces ajoutés lors du copier-coller
+            CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n')
+            PASS=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            if ! printf '%s' "$CLEAN" | base64 -d > "$RUNNER_TEMP/soundy.jks" 2>/dev/null; then
+              echo "::error::Le secret SOUNDY_KEYSTORE_BASE64 est invalide (caractères en trop ou valeur incomplète). Recopiez la longue ligne de la fiche, en entier, sans rien d'autre."
+              exit 1
+            fi
+            if ! keytool -list -keystore "$RUNNER_TEMP/soundy.jks" -storepass "$PASS" -alias soundy >/dev/null 2>&1; then
+              echo "::error::La clé n'a pas pu être ouverte : vérifiez le secret SOUNDY_KEYSTORE_PASSWORD (mot de passe de la fiche, sans espace)."
+              exit 1
+            fi
             echo "SOUNDY_KEYSTORE_FILE=$RUNNER_TEMP/soundy.jks" >> "$GITHUB_ENV"
-            echo "SOUNDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "SOUNDY_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
             echo "signed=true" >> "$GITHUB_OUTPUT"
             echo "✅ APK signé avec la clé Soundy"
           else
