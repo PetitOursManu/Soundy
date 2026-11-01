@@ -1,18 +1,88 @@
-# 🎧 Soundy
+<p align="center">
+  <img src="docs/logo.webp" alt="Soundy" width="520">
+</p>
 
-**Soundy** est un lecteur de musique au style **neumorphique** pour votre serveur **Emby**.
-Il fonctionne dans le navigateur (application web installable / PWA) et sur **Android** (via Capacitor).
+<p align="center">
+  <b>Le lecteur de musique neumorphique pour votre serveur Emby</b><br>
+  Application web installable (PWA) &nbsp;·&nbsp; Application Android &nbsp;·&nbsp; Lecture hors ligne
+</p>
+
+<p align="center">
+  <a href="https://github.com/PetitOursManu/Soundy/releases/latest"><b>📱 Télécharger l'APK Android</b></a>
+  &nbsp;·&nbsp;
+  <a href="#-installation-sur-coolify"><b>☁️ Installer la version web</b></a>
+  &nbsp;·&nbsp;
+  <a href="#-nouveautés"><b>🆕 Nouveautés</b></a>
+</p>
+
+---
+
+## 📸 Captures d'écran
+
+### Mobile
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/m-accueil.webp" width="200"><br><sub>Accueil</sub></td>
+    <td align="center"><img src="docs/screenshots/m-bibliotheque.webp" width="200"><br><sub>Bibliothèque (albums)</sub></td>
+    <td align="center"><img src="docs/screenshots/m-titres.webp" width="200"><br><sub>Titres en roue</sub></td>
+    <td align="center"><img src="docs/screenshots/m-album.webp" width="200"><br><sub>Album</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/m-lecteur.webp" width="200"><br><sub>Lecteur</sub></td>
+    <td align="center"><img src="docs/screenshots/m-recherche.webp" width="200"><br><sub>Recherche (artiste)</sub></td>
+    <td align="center"><img src="docs/screenshots/m-selection.webp" width="200"><br><sub>Sélection d'albums</sub></td>
+    <td align="center"><img src="docs/screenshots/m-demandes.webp" width="200"><br><sub>Demandes d'ajout</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/m-sombre-bibliotheque.webp" width="200"><br><sub>Thème sombre</sub></td>
+    <td align="center"><img src="docs/screenshots/m-sombre-lecteur.webp" width="200"><br><sub>Lecteur (sombre)</sub></td>
+    <td></td>
+    <td></td>
+  </tr>
+</table>
+
+### Web (ordinateur)
+
+<p align="center">
+  <img src="docs/screenshots/w-bibliotheque.webp" width="860"><br><sub>Bibliothèque</sub>
+</p>
+<p align="center">
+  <img src="docs/screenshots/w-album.webp" width="49%">
+  <img src="docs/screenshots/w-lecteur.webp" width="49%">
+</p>
+<p align="center"><sub>Album (navigation à la molette / aux flèches) &nbsp;·&nbsp; Lecteur plein écran</sub></p>
+
+> Captures réalisées avec une bibliothèque de démonstration.
+
+---
+
+## ✨ Fonctionnalités
 
 | Fonction | Détail |
 |---|---|
-| 🎵 Streaming Emby | Lecture à distance de toute la bibliothèque musicale Emby (qualité réglable). |
-| 📥 Téléchargement | Bouton de téléchargement sur chaque album / titre. **Un titre téléchargé est toujours lu depuis l'appareil en priorité**, même connecté. Espace utilisé et suppression dans les Réglages. |
-| 🎧 Bluetooth | Sortie vers casque / enceinte Bluetooth, détection de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque/de la voiture (lecture, pause, suivant, précédent). |
-| 💿 Bibliothèque | Classement **par album par défaut**, ou **titre par titre**. Tri A→Z, artiste, ajouts récents, année. |
-| 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent le long d'un arc, le titre centré est mis en avant. **PC** : molette / trackpad, flèches ↑ ↓, Page ↑/↓, Début/Fin, Entrée pour lire. **Mobile** : glisser au doigt. Menu d'un titre (télécharger, lire ensuite…) : clic droit / appui long. |
-| 🔍 Recherche | Par **album** et par **titre** (filtres Tout / Albums / Titres), recherches récentes. |
-| 📨 Demandes | Onglet pour demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres**. L'admin les valide / refuse avec un message. Notification Discord/Slack/Gotify possible. |
-| 🌗 Thème | Clair, sombre ou automatique. |
+| 🎵 Streaming Emby | Lecture de toute la bibliothèque musicale Emby, qualité réglable (sans perte → 128 kb/s). |
+| 📥 Téléchargement | Sur chaque album / titre, ou **plusieurs albums d'un coup** (bouton *Sélectionner* ou appui long). **Un titre téléchargé est toujours lu depuis l'appareil en priorité**, même connecté. Espace utilisé et suppression dans les Réglages. |
+| 💿 Bibliothèque | **Albums par défaut**, rangés **par artiste puis par ordre alphabétique**, ou vue **titre par titre**. Les albums « éclatés » par Emby (artiste de l'album différent selon les pistes) sont **réunis automatiquement**. |
+| 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent sur un cercle, le titre centré est mis en avant. **PC** : molette / trackpad, flèches, Page ↑/↓, Début/Fin, Entrée. **Mobile** : glisser au doigt. Menu d'un titre : clic droit / appui long. |
+| 🔍 Recherche | Par **album**, par **titre** et par **artiste** (filtres Tout / Albums / Titres), recherches récentes. |
+| 🎧 Bluetooth | Casque / enceinte Bluetooth, nom de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque / de la voiture. Lecture **écran éteint** avec notification de contrôle (Android). |
+| 📳 Vibrations | Petit retour haptique en défilant les titres et sur les boutons (désactivable). |
+| 📨 Demandes | Demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres** ; l'admin les valide / refuse avec un message. Notification Discord / Slack / Gotify possible. |
+| 🌗 Thème | Clair, sombre ou automatique, style neumorphique. |
+| 🔄 Mises à jour | Release GitHub automatique à chaque nouvelle version ; l'APK s'installe **par-dessus** la précédente (téléchargements conservés). |
+
+---
+
+## 🆕 Nouveautés
+
+| Version | Changements |
+|---|---|
+| **1.2.2** | Nouveau logo (icônes, écran de démarrage, en-tête). Défilement tactile rétabli quand le doigt commence sur une carte d'album. |
+| **1.2.1** | Plus d'effet d'étirement / de rebond en haut et en bas des pages. |
+| **1.2.0** | Vibrations douces (roue, boutons, appuis longs). Page Demandes corrigée dans l'appli Android (saisie de l'adresse du serveur sur la page). Écran de démarrage net, connexion sans défilement, mini lecteur et boutons du lecteur plus aérés, bras de la platine sur le vinyle, albums rangés par artiste. |
+| **1.1.0** | Albums éclatés réunis, sélection et téléchargement de plusieurs albums, recherche par artiste, bouton retour d'Android, fondu adouci sous l'en-tête, **APK signé avec une clé fixe** (mises à jour sans perte des téléchargements). |
+| **1.0.0** | Première version : streaming Emby, téléchargements hors ligne, navigation en roue, lecteur vinyle, Bluetooth, demandes d'ajout, PWA et APK Android. |
 
 ---
 
@@ -60,6 +130,9 @@ src/
   store/downloads.ts   Gestionnaire de téléchargements (file, progression, stockage)
   lib/db.ts            Stockage IndexedDB (audio, pochettes, métadonnées)
   lib/nativeBridge.ts  Liaison avec le service Android (notification, boutons Bluetooth)
+  lib/albums.ts        Regroupement des albums « éclatés » par Emby
+  lib/haptics.ts       Vibrations (retour haptique)
+  lib/backButton.ts    Bouton retour d'Android
   components/TrackWheel.tsx  Navigation en roue (molette, clavier, glisser)
   pages/               Bibliothèque, Album, Lecteur, Recherche, Demandes, Réglages
   styles/global.css    Design system neumorphique (thèmes clair / sombre)
@@ -185,7 +258,10 @@ Puis *Build → Build APK(s)*.
 
 - **Lecture en arrière-plan** : un service affiche une notification « Lecture en cours » avec les contrôles ; la musique continue écran éteint.
 - **Bluetooth** : le lecteur affiche le nom de l'appareil Bluetooth connecté et un bouton ouvre directement les réglages Bluetooth d'Android. Les boutons du casque, de l'enceinte ou de la voiture pilotent Soundy.
-- **Serveur de demandes** : dans l'app Android, renseignez l'adresse du serveur Soundy dans *Réglages → Serveur de demandes* (sauf si elle a été intégrée à la compilation).
+- **Serveur de demandes** : à la première ouverture de l'onglet *Demandes*, indiquez l'adresse de votre serveur Soundy (celle de la version web). Modifiable ensuite dans *Réglages → Serveur de demandes*.
+- **Bouton retour** : ferme la fenêtre ou la sélection ouverte, revient à l'écran précédent, puis met l'appli en arrière-plan (la musique continue).
+- **Vibrations** : retour haptique du système (suit le réglage de vibration du téléphone), désactivable dans *Réglages → Vibrations*.
+- **Mises à jour** : installez le nouvel APK par-dessus l'ancien, les titres téléchargés sont conservés.
 - Un serveur Emby en `http://` (réseau local) est accepté.
 
 ---
