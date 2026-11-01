@@ -1,6 +1,9 @@
 # Compile automatiquement l'application Android (APK) à chaque push.
 # - Push classique : APK téléchargeable dans l'onglet « Actions » → « Artifacts ».
-# - Étiquette de version (ex. v1.0.0) : une Release GitHub est créée avec l'APK.
+# - Push sur main : si la version de package.json (ex. 1.0.0) n'a pas encore de
+#   Release, une Release GitHub « v1.0.0 » est créée automatiquement avec l'APK.
+#   Pour publier une nouvelle version : augmentez "version" dans package.json.
+# - Étiquette de version (ex. v1.0.0) ou lancement manuel avec une version : idem.
 name: Android APK
 
 on:
@@ -58,14 +61,21 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Version publiée
+      - name: Version à publier
         id: rel
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
         run: |
           V="${{ inputs.version }}"
-          [ -z "$V" ] && V="${GITHUB_REF_NAME}"
+          if [ -z "$V" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="$GITHUB_REF_NAME"; fi
+          if [ -z "$V" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            V="v$(node -p "require('./package.json').version")"
+            # Déjà publiée ? On ne refait pas la Release
+            if git ls-remote --exit-code --tags origin "refs/tags/$V" >/dev/null 2>&1; then
+              echo "La release $V existe déjà, rien à publier."
+              V=""
+            fi
+          fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-$V.apk"
+          if [ -n "$V" ]; then cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-$V.apk"; fi
 
       - name: Publication de la Release GitHub
         if: steps.rel.outputs.version != ''

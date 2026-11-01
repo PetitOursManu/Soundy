@@ -128,7 +128,13 @@ EMBY_URL=http://localhost:8096 node server/index.js
 
 ## 📱 Application Android
 
-### Option 1 — APK compilé automatiquement (le plus simple)
+### Option 1 — Release GitHub (le plus simple)
+
+Ouvrez la page **Releases** du dépôt et téléchargez `Soundy-vX.Y.Z.apk` depuis le téléphone.
+Une nouvelle Release est publiée automatiquement à chaque nouvelle version arrivée sur `main` :
+il suffit d'augmenter `"version"` dans `package.json` (ex. `1.0.0` → `1.1.0`).
+
+### Option 1 bis — APK de test (chaque push)
 
 Le workflow GitHub Actions `.github/workflows/android.yml` compile l'APK à chaque push :
 
