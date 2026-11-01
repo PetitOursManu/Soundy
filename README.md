@@ -9,7 +9,7 @@ Il fonctionne dans le navigateur (application web installable / PWA) et sur **An
 | 📥 Téléchargement | Bouton de téléchargement sur chaque album / titre. **Un titre téléchargé est toujours lu depuis l'appareil en priorité**, même connecté. Espace utilisé et suppression dans les Réglages. |
 | 🎧 Bluetooth | Sortie vers casque / enceinte Bluetooth, détection de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque/de la voiture (lecture, pause, suivant, précédent). |
 | 💿 Bibliothèque | Classement **par album par défaut**, ou **titre par titre**. Tri A→Z, artiste, ajouts récents, année. |
-| 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent le long d'un arc, le titre centré est mis en avant. **PC** : molette / trackpad, flèches ↑ ↓, Page ↑/↓, Début/Fin, Entrée pour lire. **Mobile** : glisser au doigt. |
+| 🎡 Navigation en roue | Dans un album et dans la vue Titres, les morceaux défilent le long d'un arc, le titre centré est mis en avant. **PC** : molette / trackpad, flèches ↑ ↓, Page ↑/↓, Début/Fin, Entrée pour lire. **Mobile** : glisser au doigt. Menu d'un titre (télécharger, lire ensuite…) : clic droit / appui long. |
 | 🔍 Recherche | Par **album** et par **titre** (filtres Tout / Albums / Titres), recherches récentes. |
 | 📨 Demandes | Onglet pour demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres**. L'admin les valide / refuse avec un message. Notification Discord/Slack/Gotify possible. |
 | 🌗 Thème | Clair, sombre ou automatique. |

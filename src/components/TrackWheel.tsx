@@ -1,20 +1,23 @@
-// Navigation « en roue » : les titres défilent le long d'un arc, le titre
-// centré est mis en avant (pastille + bouton Lire).
+// Navigation « en roue » : les titres sont posés sur un grand cercle dont le
+// centre est à droite de l'écran. Le titre au point le plus à gauche est mis
+// en avant (pastille + bouton Lire) ; les autres s'inclinent en suivant le
+// cercle, comme sur une molette.
 // Commandes : molette / trackpad, flèches du clavier, glisser au doigt ou à la souris.
-import { useCallback, useEffect, useRef, useState } from 'react';
+// Menu d'un titre : clic droit ou appui long (et bouton ⋯ au survol sur ordinateur).
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Track } from '../api/emby';
 import { formatTime } from '../lib/format';
 import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { Cover } from './Cover';
-import { IconDownloaded, IconMore, IconPause, IconPlay } from './Icons';
+import { IconDownloaded, IconMore, IconPause } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { TrackMenu } from './TrackRow';
 
 interface Props {
   tracks: Track[];
-  /** "album" : numéro de piste au lieu de la pochette (même pochette pour tout l'album). */
+  /** "album" : sous-titre « Piste n · durée » au lieu de l'artiste. */
   mode: 'album' | 'tracks';
   onPlay: (index: number) => void;
   /** Appelé quand on approche de la fin de la liste (chargement progressif). */
@@ -24,18 +27,27 @@ interface Props {
   /** Clé de mémorisation de la position (retour sur la page). */
   storageKey?: string;
   label?: string;
-  /** Album sur plusieurs disques : numéro affiché sous la forme 2·05. */
+  /** Album sur plusieurs disques : numéro affiché sous la forme 2-05. */
   multiDisc?: boolean;
 }
 
-const SPACING = 96; // px entre deux titres
-const VISIBLE = 6; // titres rendus de chaque côté du titre centré
+const STEP = (18 * Math.PI) / 180; // angle entre deux titres sur le cercle
+const VISIBLE = 5; // titres rendus de chaque côté du titre centré
+const MAX_WIDTH = 540; // largeur maximale de la roue (px)
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 function isTyping(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+}
+
+/** Dimensions calculées à partir de la largeur disponible. */
+function geometry(width: number) {
+  const w = Math.min(width, MAX_WIDTH);
+  const cover = clamp(Math.round(w * 0.25), 78, 118);
+  const spacing = Math.round(cover * 1.2);
+  return { w, cover, spacing, radius: spacing / Math.sin(STEP) };
 }
 
 export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey, label = 'Liste des titres', multiDisc }: Props) {
@@ -56,10 +68,24 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
   maxRef.current = max;
   const raf = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
+  const [geo, setGeo] = useState(() => geometry(window.innerWidth));
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
   const [menu, setMenu] = useState<Track | null>(null);
   const focus = clamp(Math.round(pos), 0, max);
   const onPlayRef = useRef(onPlay);
   onPlayRef.current = onPlay;
+
+  // Taille de la roue selon la largeur de l'écran
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setGeo(geometry(el.clientWidth));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // --- Animation vers la cible (amortie) ---------------------------------
   const animate = useCallback(() => {
@@ -74,7 +100,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
         setPos(target.current);
         return;
       }
-      posRef.current += diff * (1 - Math.exp((-dt * 14) / 1000));
+      posRef.current += diff * (1 - Math.exp((-dt * 13) / 1000));
       setPos(posRef.current);
       raf.current = requestAnimationFrame(step);
     };
@@ -179,13 +205,32 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     return () => window.removeEventListener('keydown', onKey);
   }, [goTo]);
 
-  // --- Glisser (doigt ou souris) ---------------------------------------------
+  // --- Glisser (doigt ou souris) + appui long -------------------------------
   const drag = useRef<{ id: number; y: number; start: number; moved: boolean; samples: { t: number; p: number }[] } | null>(null);
   const suppressClick = useRef(false);
+  const longPress = useRef<number>();
+
+  const suppressNextClick = () => {
+    suppressClick.current = true;
+    setTimeout(() => (suppressClick.current = false), 0);
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     drag.current = { id: e.pointerId, y: e.clientY, start: posRef.current, moved: false, samples: [] };
+    // Appui long (tactile) sur un titre → menu
+    const item = (e.target as HTMLElement).closest<HTMLElement>('[data-index]');
+    clearTimeout(longPress.current);
+    if (item && e.pointerType !== 'mouse') {
+      longPress.current = window.setTimeout(() => {
+        if (drag.current && !drag.current.moved) {
+          drag.current = null;
+          suppressNextClick();
+          navigator.vibrate?.(15);
+          setMenu(tracks[Number(item.dataset.index)]);
+        }
+      }, 550);
+    }
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -195,10 +240,11 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     if (!d.moved) {
       if (Math.abs(dy) < 6) return;
       d.moved = true;
+      clearTimeout(longPress.current);
       cancelAnimationFrame(raf.current);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
-    let p = d.start - dy / SPACING;
+    let p = d.start - dy / geoRef.current.spacing;
     // Effet élastique aux extrémités
     if (p < 0) p = p / 3;
     if (p > maxRef.current) p = maxRef.current + (p - maxRef.current) / 3;
@@ -210,58 +256,68 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    clearTimeout(longPress.current);
     const d = drag.current;
     drag.current = null;
     if (!d || d.id !== e.pointerId || !d.moved) return;
-    suppressClick.current = true;
-    setTimeout(() => (suppressClick.current = false), 0);
+    suppressNextClick();
     const s = d.samples;
     const v = s.length > 1 ? (s[s.length - 1].p - s[0].p) / ((s[s.length - 1].t - s[0].t) / 1000 || 1) : 0; // titres / s
     goTo(posRef.current + clamp(v, -40, 40) * 0.22);
   };
-
-  if (!tracks.length) return null;
 
   const from = Math.max(0, focus - VISIBLE);
   const to = Math.min(max, focus + VISIBLE);
   const items = [];
   for (let i = from; i <= to; i++) items.push(i);
   const count = total ?? tracks.length;
+  const trackNumber = (t: Track, i: number) =>
+    multiDisc ? `${t.disc ?? 1}-${String(t.index ?? i + 1).padStart(2, '0')}` : String(t.index ?? i + 1);
 
   return (
     <>
-    <div
-      ref={ref}
-      className="wheel"
-      role="listbox"
-      tabIndex={0}
-      aria-label={`${label} — molette, flèches ou glisser pour naviguer`}
-      aria-activedescendant={`wheel-${tracks[focus]?.id}`}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onClickCapture={(e) => {
-        if (suppressClick.current) {
-          e.stopPropagation();
+      <div
+        ref={ref}
+        className="wheel"
+        role="listbox"
+        tabIndex={0}
+        aria-label={`${label} — molette, flèches ou glisser pour naviguer`}
+        aria-activedescendant={tracks[focus] ? `wheel-${tracks[focus].id}` : undefined}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onContextMenu={(e) => {
+          const item = (e.target as HTMLElement).closest<HTMLElement>('[data-index]');
+          if (!item) return;
           e.preventDefault();
-        }
-      }}
-    >
-      {items.map((i) => (
-        <WheelItem
-          key={tracks[i].id}
-          track={tracks[i]}
-          offset={i - pos}
-          number={multiDisc ? `${tracks[i].disc ?? 1}·${String(tracks[i].index ?? i + 1).padStart(2, '0')}` : String(tracks[i].index ?? i + 1)}
-          mode={mode}
-          focused={i === focus}
-          onSelect={() => (i === focus ? onPlay(i) : goTo(i))}
-          onPlay={() => onPlay(i)}
-          onMenu={() => setMenu(tracks[i])}
-        />
-      ))}
-    </div>
+          setMenu(tracks[Number(item.dataset.index)]);
+        }}
+        onClickCapture={(e) => {
+          if (suppressClick.current) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
+        style={{ ['--cover' as string]: `${geo.cover}px` }}
+      >
+        <div className="wheel-track" style={{ width: geo.w }}>
+          {items.map((i) => (
+            <WheelItem
+              key={tracks[i].id}
+              index={i}
+              track={tracks[i]}
+              offset={i - pos}
+              geo={geo}
+              subtitle={mode === 'album' ? `Piste ${trackNumber(tracks[i], i)} · ${formatTime(tracks[i].duration)}` : tracks[i].artist}
+              focused={i === focus}
+              onSelect={() => (i === focus ? onPlay(i) : goTo(i))}
+              onPlay={() => onPlay(i)}
+              onMenu={() => setMenu(tracks[i])}
+            />
+          ))}
+        </div>
+      </div>
 
       {count > 1 && (
         <div className="wheel-scroll" aria-hidden>
@@ -278,17 +334,18 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
 }
 
 interface ItemProps {
+  index: number;
   track: Track;
   offset: number;
-  number: string;
-  mode: 'album' | 'tracks';
+  geo: ReturnType<typeof geometry>;
+  subtitle: string;
   focused: boolean;
   onSelect: () => void;
   onPlay: () => void;
   onMenu: () => void;
 }
 
-function WheelItem({ track, offset, number, mode, focused, onSelect, onPlay, onMenu }: ItemProps) {
+function WheelItem({ index, track, offset, geo, subtitle, focused, onSelect, onPlay, onMenu }: ItemProps) {
   const isCurrent = usePlayer((s) => s.queue[s.index]?.id === track.id);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const toggle = usePlayer((s) => s.toggle);
@@ -297,56 +354,45 @@ function WheelItem({ track, offset, number, mode, focused, onSelect, onPlay, onM
   const online = useNetwork((s) => s.online);
   const unavailable = !online && !downloaded;
 
+  // Position sur le cercle (centre du cercle à droite)
   const ad = Math.abs(offset);
-  const near = Math.max(0, 1 - ad); // 1 = centré
-  const x = Math.pow(ad, 1.35) * 24;
-  const y = offset * SPACING;
-  const rot = offset * 10;
-  const scale = 1 - Math.min(ad, 4) * 0.07;
-  const opacity = Math.max(0, 1 - ad * 0.23) * (unavailable ? 0.45 : 1);
+  const theta = clamp(offset, -VISIBLE - 1, VISIBLE + 1) * STEP;
+  const y = geo.radius * Math.sin(theta);
+  const x = geo.radius * (1 - Math.cos(theta));
+  const rot = (-theta * 0.75 * 180) / Math.PI; // au-dessus : penché vers le bas à droite
+  const near = Math.max(0, 1 - ad); // 1 = titre centré
+  const scale = 1 - Math.min(ad, 3) * 0.03;
+  const opacity = Math.max(0, 1 - ad * 0.14) * (unavailable ? 0.45 : 1);
 
   return (
     <div
       id={`wheel-${track.id}`}
+      data-index={index}
       role="option"
       aria-selected={focused}
       className={`wheel-item ${focused ? 'focused' : ''} ${isCurrent ? 'current' : ''}`}
       style={{
+        height: geo.cover,
         transform: `translate(${x}px, calc(-50% + ${y}px)) rotate(${rot}deg) scale(${scale})`,
         opacity,
         zIndex: 100 - Math.round(ad * 10),
       }}
       onClick={onSelect}
     >
-      <span className="wheel-pill" style={{ opacity: near }} />
+      <span className="wheel-pill" style={{ opacity: near, left: geo.cover * 0.45 }} />
       <span className="wheel-disc">
-        {mode === 'tracks' ? (
-          <Cover imageId={track.imageId} tag={track.imageTag} size={160} style={{ width: '100%', height: '100%' }} />
-        ) : (
-          <span className="wheel-num">
-            {isCurrent ? (
-              <span className={`eq ${isPlaying ? '' : 'paused'}`}>
-                <i />
-                <i />
-                <i />
-              </span>
-            ) : (
-              number
-            )}
-          </span>
-        )}
+        <Cover imageId={track.imageId} tag={track.imageTag} size={240} style={{ width: '100%', height: '100%' }} alt="" />
       </span>
-      <span className="wheel-text">
+      <span className="wheel-text" style={{ paddingRight: near * 108 }}>
         <span className="wt ellipsis">{track.title}</span>
         <span className="ws">
           {task ? <ProgressRing value={task.progress} size={13} /> : downloaded && <IconDownloaded aria-label="Téléchargé" />}
-          <span className="ellipsis">{track.artist}</span>
+          <span className="ellipsis">{subtitle}</span>
         </span>
       </span>
       <span className="wheel-actions" style={{ opacity: near, pointerEvents: near > 0.6 ? 'auto' : 'none' }}>
-        <span className="dur">{formatTime(track.duration)}</span>
         <button
-          className="icon-btn sm flat"
+          className="icon-btn sm flat wheel-more"
           aria-label="Plus d'options"
           tabIndex={focused ? 0 : -1}
           onClick={(e) => {
@@ -372,9 +418,7 @@ function WheelItem({ track, offset, number, mode, focused, onSelect, onPlay, onM
               <IconPause /> <span className="lbl">Pause</span>
             </>
           ) : (
-            <>
-              <IconPlay /> <span className="lbl">Lire</span>
-            </>
+            <span className="lbl">Lire</span>
           )}
         </button>
       </span>
