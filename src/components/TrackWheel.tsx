@@ -2,9 +2,15 @@
 // centre est à droite de l'écran. Le titre au point le plus à gauche est mis
 // en avant (pastille + bouton Lire) ; les autres s'inclinent en suivant le
 // cercle, comme sur une molette.
+//
+// Performance : pendant l'animation, React n'est PAS sollicité. Les positions
+// sont écrites directement dans le DOM (transform / opacity uniquement, donc
+// traitées par le GPU). React ne refait un rendu que lorsque le titre centré
+// change.
+//
 // Commandes : molette / trackpad, flèches du clavier, glisser au doigt ou à la souris.
 // Menu d'un titre : clic droit ou appui long (et bouton ⋯ au survol sur ordinateur).
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Track } from '../api/emby';
 import { formatTime } from '../lib/format';
 import { useDownloads } from '../store/downloads';
@@ -50,6 +56,13 @@ function geometry(width: number) {
   return { w, cover, spacing, radius: spacing / Math.sin(STEP) };
 }
 
+interface ItemNodes {
+  el: HTMLDivElement;
+  pill: HTMLElement | null;
+  text: HTMLElement | null;
+  actions: HTMLElement | null;
+}
+
 export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey, label = 'Liste des titres', multiDisc }: Props) {
   const max = Math.max(0, tracks.length - 1);
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
@@ -61,20 +74,83 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     return playing > 0 ? playing : 0;
   };
 
-  const [pos, setPos] = useState(initial);
-  const posRef = useRef(pos);
-  const target = useRef(Math.round(pos));
+  // Seul le titre centré (entier) passe par l'état React
+  const [focus, setFocus] = useState(initial);
+  const focusRef = useRef(focus);
+  const posRef = useRef<number>(focus); // position continue (animée)
+  const target = useRef<number>(focus);
   const maxRef = useRef(max);
   maxRef.current = max;
   const raf = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLElement>(null);
+  const nodes = useRef(new Map<number, ItemNodes>());
   const [geo, setGeo] = useState(() => geometry(window.innerWidth));
   const geoRef = useRef(geo);
   geoRef.current = geo;
   const [menu, setMenu] = useState<Track | null>(null);
-  const focus = clamp(Math.round(pos), 0, max);
   const onPlayRef = useRef(onPlay);
   onPlayRef.current = onPlay;
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
+  const count = total ?? tracks.length;
+  const countRef = useRef(count);
+  countRef.current = count;
+
+  // --- Placement des titres (appelé à chaque image) ---------------------------
+  const apply = useCallback(() => {
+    const pos = posRef.current;
+    const g = geoRef.current;
+    nodes.current.forEach((n, i) => {
+      const offset = i - pos;
+      const ad = Math.abs(offset);
+      const theta = clamp(offset, -VISIBLE - 1, VISIBLE + 1) * STEP;
+      const y = g.radius * Math.sin(theta);
+      const x = g.radius * (1 - Math.cos(theta));
+      const rot = -theta * 0.75; // au-dessus : penché vers le bas à droite
+      const scale = 1 - Math.min(ad, 3) * 0.03;
+      const near = Math.max(0, 1 - ad);
+      const dim = n.el.dataset.dim === '1' ? 0.45 : 1;
+      n.el.style.transform = `translate3d(${x.toFixed(2)}px, ${(y - g.cover / 2).toFixed(2)}px, 0) rotate(${rot.toFixed(4)}rad) scale(${scale.toFixed(4)})`;
+      n.el.style.opacity = String(Math.max(0, 1 - ad * 0.14) * dim);
+      n.el.style.zIndex = String(100 - Math.round(ad * 10));
+      if (n.pill) n.pill.style.opacity = String(near);
+      if (n.actions) {
+        n.actions.style.opacity = String(near);
+        n.actions.style.pointerEvents = near > 0.6 ? 'auto' : 'none';
+      }
+      if (n.text) n.text.style.paddingRight = `${Math.round(near * 108)}px`;
+    });
+    if (thumbRef.current) {
+      thumbRef.current.style.top = `${(clamp(pos, 0, maxRef.current) / Math.max(1, countRef.current - 1)) * 100}%`;
+    }
+    const f = clamp(Math.round(pos), 0, maxRef.current);
+    if (f !== focusRef.current) {
+      focusRef.current = f;
+      setFocus(f);
+    }
+  }, []);
+
+  const register = useCallback(
+    (i: number, el: HTMLDivElement | null) => {
+      if (!el) {
+        nodes.current.delete(i);
+        return;
+      }
+      nodes.current.set(i, {
+        el,
+        pill: el.querySelector<HTMLElement>('.wheel-pill'),
+        text: el.querySelector<HTMLElement>('.wheel-text'),
+        actions: el.querySelector<HTMLElement>('.wheel-actions'),
+      });
+    },
+    [],
+  );
+
+  // Après chaque rendu React (nouveaux titres visibles…), on replace tout avant l'affichage
+  useLayoutEffect(() => {
+    apply();
+  });
 
   // Taille de la roue selon la largeur de l'écran
   useLayoutEffect(() => {
@@ -87,32 +163,47 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     return () => ro.disconnect();
   }, []);
 
-  // --- Animation vers la cible (amortie) ---------------------------------
+  // --- Animation vers la cible (ressort amorti) -----------------------------
+  const velocity = useRef(0);
   const animate = useCallback(() => {
     cancelAnimationFrame(raf.current);
     let last = performance.now();
     const step = (now: number) => {
-      const dt = Math.min(64, now - last);
+      const dt = Math.min(0.032, (now - last) / 1000);
       last = now;
+      // Ressort critique : mouvement doux, sans rebond
+      const k = 170; // raideur
+      const c = 2 * Math.sqrt(k); // amortissement critique
       const diff = target.current - posRef.current;
-      if (Math.abs(diff) < 0.002) {
+      velocity.current += (k * diff - c * velocity.current) * dt;
+      posRef.current += velocity.current * dt;
+      if (Math.abs(diff) < 0.0008 && Math.abs(velocity.current) < 0.01) {
         posRef.current = target.current;
-        setPos(target.current);
+        velocity.current = 0;
+        apply();
         return;
       }
-      posRef.current += diff * (1 - Math.exp((-dt * 13) / 1000));
-      setPos(posRef.current);
+      apply();
       raf.current = requestAnimationFrame(step);
     };
     raf.current = requestAnimationFrame(step);
-  }, []);
+  }, [apply]);
 
   const goTo = useCallback(
     (i: number) => {
-      target.current = clamp(Math.round(i), 0, maxRef.current);
+      const t = clamp(Math.round(i), 0, maxRef.current);
+      target.current = t;
+      // Grand saut (Début / Fin, Page…) : on se place à 4 titres de la cible puis on glisse,
+      // pour éviter d'afficher des dizaines de pochettes en une seconde
+      const diff = t - posRef.current;
+      if (Math.abs(diff) > 6) {
+        posRef.current = t - Math.sign(diff) * 4;
+        velocity.current = 0;
+        apply();
+      }
       animate();
     },
-    [animate],
+    [animate, apply],
   );
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
@@ -137,37 +228,39 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    let acc = 0;
     let lastStep = 0;
+    let snapTimer = 0;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
       const now = performance.now();
-      if (Math.abs(delta) >= 50) {
-        // Molette de souris : un cran = un titre
-        if (now - lastStep < 40) return;
+      if (e.deltaMode !== 0 || (Math.abs(delta) >= 50 && Number.isInteger(e.deltaY))) {
+        // Molette de souris : un cran = un titre, avec animation douce
+        if (now - lastStep < 35) return;
         lastStep = now;
-        acc = 0;
-        goTo(target.current + Math.sign(delta));
-      } else {
-        // Trackpad : petits déplacements cumulés
-        acc += delta;
-        if (Math.abs(acc) >= 38) {
-          goTo(target.current + Math.sign(acc));
-          acc = 0;
-        }
+        goTo(Math.round(target.current) + Math.sign(delta));
+        return;
       }
+      // Trackpad : la roue suit le doigt en continu, puis se cale sur le titre le plus proche
+      const g = geoRef.current;
+      target.current = clamp(target.current + delta / (g.spacing * 0.85), -0.35, maxRef.current + 0.35);
+      animate();
+      clearTimeout(snapTimer);
+      snapTimer = window.setTimeout(() => goTo(target.current), 110);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [goTo]);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      clearTimeout(snapTimer);
+    };
+  }, [goTo, animate]);
 
   // --- Clavier ---------------------------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target) || e.altKey || e.ctrlKey || e.metaKey) return;
       if (document.querySelector('.backdrop')) return; // une feuille est ouverte
-      const t = target.current;
+      const t = Math.round(target.current);
       const nav = ['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'PageDown', 'PageUp', 'Home', 'End'];
       // La roue prend le focus clavier dès qu'on navigue avec les flèches
       if (nav.includes(e.key)) ref.current?.focus({ preventScroll: true });
@@ -194,7 +287,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
           break;
         case 'Enter':
           if (e.target !== ref.current && ['BUTTON', 'A'].includes((e.target as HTMLElement)?.tagName)) return;
-          onPlayRef.current(t);
+          onPlayRef.current(focusRef.current);
           break;
         default:
           return;
@@ -227,7 +320,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
           drag.current = null;
           suppressNextClick();
           navigator.vibrate?.(15);
-          setMenu(tracks[Number(item.dataset.index)]);
+          setMenu(tracksRef.current[Number(item.dataset.index)]);
         }
       }, 550);
     }
@@ -242,6 +335,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
       d.moved = true;
       clearTimeout(longPress.current);
       cancelAnimationFrame(raf.current);
+      velocity.current = 0;
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
     let p = d.start - dy / geoRef.current.spacing;
@@ -249,10 +343,11 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     if (p < 0) p = p / 3;
     if (p > maxRef.current) p = maxRef.current + (p - maxRef.current) / 3;
     posRef.current = p;
-    setPos(p);
+    target.current = p;
+    apply();
     const now = performance.now();
     d.samples.push({ t: now, p });
-    d.samples = d.samples.filter((s) => now - s.t < 120);
+    d.samples = d.samples.filter((s) => now - s.t < 100);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -263,14 +358,20 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     suppressNextClick();
     const s = d.samples;
     const v = s.length > 1 ? (s[s.length - 1].p - s[0].p) / ((s[s.length - 1].t - s[0].t) / 1000 || 1) : 0; // titres / s
+    // Élan : la roue continue sur sa lancée puis se cale sur un titre
+    velocity.current = clamp(v, -30, 30) * 0.6;
     goTo(posRef.current + clamp(v, -40, 40) * 0.22);
   };
+
+  // Gestionnaires stables (évite de redessiner tous les titres)
+  const selectIndex = useCallback((i: number) => (i === focusRef.current ? onPlayRef.current(i) : goTo(i)), [goTo]);
+  const playIndex = useCallback((i: number) => onPlayRef.current(i), []);
+  const menuIndex = useCallback((i: number) => setMenu(tracksRef.current[i]), []);
 
   const from = Math.max(0, focus - VISIBLE);
   const to = Math.min(max, focus + VISIBLE);
   const items = [];
   for (let i = from; i <= to; i++) items.push(i);
-  const count = total ?? tracks.length;
   const trackNumber = (t: Track, i: number) =>
     multiDisc ? `${t.disc ?? 1}-${String(t.index ?? i + 1).padStart(2, '0')}` : String(t.index ?? i + 1);
 
@@ -307,21 +408,25 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
               key={tracks[i].id}
               index={i}
               track={tracks[i]}
-              offset={i - pos}
-              geo={geo}
+              cover={geo.cover}
               subtitle={mode === 'album' ? `Piste ${trackNumber(tracks[i], i)} · ${formatTime(tracks[i].duration)}` : tracks[i].artist}
               focused={i === focus}
-              onSelect={() => (i === focus ? onPlay(i) : goTo(i))}
-              onPlay={() => onPlay(i)}
-              onMenu={() => setMenu(tracks[i])}
+              register={register}
+              onSelect={selectIndex}
+              onPlay={playIndex}
+              onMenu={menuIndex}
             />
           ))}
         </div>
       </div>
 
+      {/* Fondu haut / bas (plus léger qu'un masque CSS) */}
+      <div className="wheel-fade top" aria-hidden />
+      <div className="wheel-fade bottom" aria-hidden />
+
       {count > 1 && (
         <div className="wheel-scroll" aria-hidden>
-          <i style={{ top: `${(clamp(pos, 0, max) / Math.max(1, count - 1)) * 100}%` }} />
+          <i ref={thumbRef} />
         </div>
       )}
       <div className="wheel-counter" aria-live="polite">
@@ -336,84 +441,72 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
 interface ItemProps {
   index: number;
   track: Track;
-  offset: number;
-  geo: ReturnType<typeof geometry>;
+  cover: number;
   subtitle: string;
   focused: boolean;
-  onSelect: () => void;
-  onPlay: () => void;
-  onMenu: () => void;
+  register: (i: number, el: HTMLDivElement | null) => void;
+  onSelect: (i: number) => void;
+  onPlay: (i: number) => void;
+  onMenu: (i: number) => void;
 }
 
-function WheelItem({ index, track, offset, geo, subtitle, focused, onSelect, onPlay, onMenu }: ItemProps) {
+const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focused, register, onSelect, onPlay, onMenu }: ItemProps) {
   const isCurrent = usePlayer((s) => s.queue[s.index]?.id === track.id);
-  const isPlaying = usePlayer((s) => s.isPlaying);
+  const isPlaying = usePlayer((s) => isCurrent && s.isPlaying);
   const toggle = usePlayer((s) => s.toggle);
   const downloaded = useDownloads((s) => !!s.downloaded[track.id]);
-  const task = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id));
+  const progress = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id)?.progress);
   const online = useNetwork((s) => s.online);
   const unavailable = !online && !downloaded;
-
-  // Position sur le cercle (centre du cercle à droite)
-  const ad = Math.abs(offset);
-  const theta = clamp(offset, -VISIBLE - 1, VISIBLE + 1) * STEP;
-  const y = geo.radius * Math.sin(theta);
-  const x = geo.radius * (1 - Math.cos(theta));
-  const rot = (-theta * 0.75 * 180) / Math.PI; // au-dessus : penché vers le bas à droite
-  const near = Math.max(0, 1 - ad); // 1 = titre centré
-  const scale = 1 - Math.min(ad, 3) * 0.03;
-  const opacity = Math.max(0, 1 - ad * 0.14) * (unavailable ? 0.45 : 1);
+  const setRef = useCallback((el: HTMLDivElement | null) => register(index, el), [register, index]);
 
   return (
     <div
+      ref={setRef}
       id={`wheel-${track.id}`}
       data-index={index}
+      data-dim={unavailable ? '1' : '0'}
       role="option"
       aria-selected={focused}
       className={`wheel-item ${focused ? 'focused' : ''} ${isCurrent ? 'current' : ''}`}
-      style={{
-        height: geo.cover,
-        transform: `translate(${x}px, calc(-50% + ${y}px)) rotate(${rot}deg) scale(${scale})`,
-        opacity,
-        zIndex: 100 - Math.round(ad * 10),
-      }}
-      onClick={onSelect}
+      style={{ height: cover }}
+      onClick={() => onSelect(index)}
     >
-      <span className="wheel-pill" style={{ opacity: near, left: geo.cover * 0.45 }} />
+      <span className="wheel-pill" style={{ left: cover * 0.45 }} />
       <span className="wheel-disc">
         <Cover imageId={track.imageId} tag={track.imageTag} size={240} style={{ width: '100%', height: '100%' }} alt="" />
       </span>
-      <span className="wheel-text" style={{ paddingRight: near * 108 }}>
+      <span className="wheel-text">
         <span className="wt ellipsis">{track.title}</span>
         <span className="ws">
-          {task ? <ProgressRing value={task.progress} size={13} /> : downloaded && <IconDownloaded aria-label="Téléchargé" />}
+          {progress !== undefined ? <ProgressRing value={progress} size={13} /> : downloaded && <IconDownloaded aria-label="Téléchargé" />}
           <span className="ellipsis">{subtitle}</span>
         </span>
       </span>
-      <span className="wheel-actions" style={{ opacity: near, pointerEvents: near > 0.6 ? 'auto' : 'none' }}>
+      <span className="wheel-actions">
         <button
           className="icon-btn sm flat wheel-more"
           aria-label="Plus d'options"
           tabIndex={focused ? 0 : -1}
           onClick={(e) => {
             e.stopPropagation();
-            onMenu();
+            onMenu(index);
           }}
         >
           <IconMore />
         </button>
         <button
           className={`play-pill ${isCurrent ? 'on' : ''}`}
-          aria-label={isCurrent && isPlaying ? 'Pause' : 'Lire'}
+          aria-label={isPlaying ? 'Pause' : 'Lire'}
           tabIndex={focused ? 0 : -1}
           disabled={unavailable}
           onClick={(e) => {
             e.stopPropagation();
             if (isCurrent) toggle();
-            else onPlay();
+            else onPlay(index);
           }}
         >
-          {isCurrent && isPlaying ? (
+          {isPlaying ? (
             <>
               <IconPause /> <span className="lbl">Pause</span>
             </>
@@ -424,4 +517,4 @@ function WheelItem({ index, track, offset, geo, subtitle, focused, onSelect, onP
       </span>
     </div>
   );
-}
+});

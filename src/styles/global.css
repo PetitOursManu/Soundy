@@ -1961,8 +1961,27 @@ input[type='search']::-webkit-search-decoration {
   -webkit-user-select: none;
   cursor: grab;
   outline: none;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+  contain: strict;
+}
+
+/* Fondus haut / bas posés par-dessus la roue */
+.wheel-fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 24%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.wheel-fade.top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--bg) 8%, transparent);
+}
+
+.wheel-fade.bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--bg) 8%, transparent);
 }
 
 .wheel:active {
@@ -1987,6 +2006,8 @@ input[type='search']::-webkit-search-decoration {
   padding-right: 12px;
   transform-origin: calc(var(--cover) / 2) 50%;
   will-change: transform, opacity;
+  backface-visibility: hidden;
+  contain: layout style;
   cursor: pointer;
 }
 
@@ -1999,6 +2020,7 @@ input[type='search']::-webkit-search-decoration {
   background: var(--bg);
   box-shadow: var(--neu);
   pointer-events: none;
+  will-change: opacity;
 }
 
 .wheel-disc {
@@ -2007,7 +2029,7 @@ input[type='search']::-webkit-search-decoration {
   height: var(--cover);
   flex: none;
   border-radius: 50%;
-  box-shadow: 10px 12px 24px var(--sh-dark), -6px -6px 16px var(--sh-light);
+  box-shadow: 8px 10px 18px var(--sh-dark), -5px -5px 12px var(--sh-light);
 }
 
 .wheel-disc .cover {
@@ -2031,7 +2053,6 @@ input[type='search']::-webkit-search-decoration {
   font-size: clamp(17px, 4.6vw, 21px);
   letter-spacing: -0.02em;
   color: var(--text-3);
-  transition: color 0.25s;
 }
 
 .wheel-item.focused .wt {
@@ -2125,6 +2146,7 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .wheel-scroll {
+  z-index: 3;
   position: absolute;
   right: 10px;
   top: 30%;
@@ -2138,6 +2160,7 @@ input[type='search']::-webkit-search-decoration {
 
 .wheel-scroll i {
   position: absolute;
+  top: 0;
   left: 0;
   width: 5px;
   height: 18px;
@@ -2147,6 +2170,7 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .wheel-counter {
+  z-index: 3;
   position: absolute;
   right: 4px;
   bottom: 0;
