@@ -1,0 +1,51 @@
+# Compile automatiquement l'application Android (APK) à chaque push.
+# L'APK est téléchargeable dans l'onglet « Actions » du dépôt → dernier
+# workflow → section « Artifacts ».
+name: Android APK
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Compilation de l'application web
+        run: npm run build
+        env:
+          # À définir dans Settings → Secrets and variables → Actions → Variables
+          VITE_EMBY_URL: ${{ vars.SOUNDY_EMBY_URL }}
+          VITE_REQUESTS_URL: ${{ vars.SOUNDY_REQUESTS_URL }}
+
+      - name: Synchronisation Capacitor
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Compilation de l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soundy-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

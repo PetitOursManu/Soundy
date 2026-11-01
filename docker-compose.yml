@@ -1,0 +1,32 @@
+# Exemple de déploiement de Soundy à côté d'Emby.
+#   docker compose up -d --build
+# Puis ouvrez http://IP_DU_SERVEUR:8080 (idéalement derrière un reverse proxy HTTPS).
+services:
+  soundy:
+    build: .
+    container_name: soundy
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Adresse d'Emby vue depuis le conteneur Soundy (réseau Docker ou URL publique)
+      EMBY_URL: "http://emby:8096"
+      # Origines autorisées à appeler l'API des demandes (* = toutes, nécessaire pour l'app Android)
+      CORS_ORIGINS: "*"
+      # Notification à chaque nouvelle demande (Discord, Slack, Gotify, ntfy…) — facultatif
+      # WEBHOOK_URL: "https://discord.com/api/webhooks/xxxx/yyyy"
+      # Proxy /emby → EMBY_URL, utile si votre Emby refuse les requêtes CORS — facultatif
+      # EMBY_PROXY: "true"
+    volumes:
+      - ./data:/data
+
+  # Si Emby tourne déjà dans Docker sur la même machine, mettez les deux
+  # conteneurs sur le même réseau, par exemple :
+  # emby:
+  #   image: emby/embyserver
+  #   ...
+
+# networks:
+#   default:
+#     name: media
+#     external: true

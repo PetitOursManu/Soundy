@@ -1,0 +1,14 @@
+{
+  "name": "Soundy",
+  "short_name": "Soundy",
+  "description": "Votre musique Emby, en streaming ou hors ligne.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e6ebf5",
+  "theme_color": "#e6ebf5",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
