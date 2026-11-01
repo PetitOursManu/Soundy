@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.4.2** | Artwork shown for albums without their own image in Emby (taken from a track). Reliable artist sort: albums by the same artist side by side ("feat.", case and accent variants grouped), then alphabetical order. |
 | **1.4.1** | Simpler request notifications: service detected automatically (ntfy, Discord, Gotify, Slack), test button in Settings (admin), guide in the README. |
 | **1.4.0** | **Favorites** by track and by album (synced with Emby), "Favorites" filter in the library (albums and tracks). |
 | **1.3.0** | **English version** of the app: language picker on first launch, in Settings and on the sign-in screen (interface, Android notification, server error messages). English README. |

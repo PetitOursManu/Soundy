@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.4.2** | Pochettes affichées pour les albums sans image propre dans Emby (celle d'un titre). Tri par artiste fiable : albums d'un même artiste côte à côte (variantes « feat. », majuscules, accents regroupées), puis ordre alphabétique. |
 | **1.4.1** | Notifications des demandes plus simples : service reconnu automatiquement (ntfy, Discord, Gotify, Slack), bouton de test dans les Réglages (admin), guide dans le README. |
 | **1.4.0** | **Favoris** par titre et par album (synchronisés avec Emby), filtre « Favoris » dans la bibliothèque (albums et titres). |
 | **1.3.0** | **Version anglaise** de l'appli : choix de la langue au premier lancement, dans les Réglages et sur l'écran de connexion (interface, notification Android, messages d'erreur du serveur). README en anglais. |

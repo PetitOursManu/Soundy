@@ -1,6 +1,6 @@
 // Client minimal pour l'API Emby.
 // Documentation : https://dev.emby.media/doc/restapi/index.html
-import { sameAlbum } from '../lib/albums';
+import { artistTokens, normName, sameAlbum } from '../lib/albums';
 import { t } from '../i18n';
 
 export const APP_NAME = 'Soundy';
@@ -311,6 +311,69 @@ export class EmbyClient {
   }
 
   /** Autres « morceaux » du même album qu'Emby aurait séparés (même nom, artiste commun). */
+  // --- Tri par artiste, fait par Soundy -----------------------------------
+  // Emby trie sur le texte exact de l'« artiste de l'album » et par pages :
+  // « Ed Sheeran » et « Ed Sheeran feat. X » se retrouvent séparés. On charge
+  // donc la liste complète (champs réduits) et on la trie ici : artiste
+  // principal (sans « feat. », accents, majuscules), puis titre de l'album.
+  private artistSorted: { key: string; at: number; items: Album[] } | null = null;
+
+  async getAlbumsByArtist(opts: { start?: number; limit?: number; favorites?: boolean; signal?: AbortSignal } = {}): Promise<Page<Album>> {
+    const key = opts.favorites ? 'fav' : 'all';
+    const fresh = this.artistSorted && this.artistSorted.key === key && Date.now() - this.artistSorted.at < 5 * 60_000;
+    if (!fresh || (opts.start ?? 0) === 0) {
+      const all: Album[] = [];
+      const CHUNK = 500;
+      for (let start = 0; ; start += CHUNK) {
+        const r = await this.items(
+          {
+            IncludeItemTypes: 'MusicAlbum',
+            Recursive: true,
+            Filters: opts.favorites ? 'IsFavorite' : undefined,
+            SortBy: 'SortName',
+            Fields: ALBUM_FIELDS,
+            ImageTypeLimit: 1,
+            EnableImageTypes: 'Primary',
+            StartIndex: start,
+            Limit: CHUNK,
+          },
+          opts.signal,
+        );
+        all.push(...r.Items.map(toAlbum));
+        if (r.Items.length < CHUNK || all.length >= r.TotalRecordCount) break;
+      }
+      const sortKey = (a: Album) => artistTokens(a.artist)[0] ?? normName(a.artist);
+      all.sort(
+        (a, b) =>
+          sortKey(a).localeCompare(sortKey(b), 'fr', { sensitivity: 'base' }) ||
+          normName(a.title).localeCompare(normName(b.title), 'fr', { sensitivity: 'base', numeric: true }),
+      );
+      this.artistSorted = { key, at: Date.now(), items: all };
+    }
+    const start = opts.start ?? 0;
+    const items = this.artistSorted!.items;
+    return { items: items.slice(start, start + (opts.limit ?? 60)), total: items.length };
+  }
+
+  /** Pochette d'un album sans image propre : celle d'un de ses titres. */
+  async findAlbumCover(albumId: string): Promise<{ imageId: string; tag?: string } | null> {
+    const r = await this.items({
+      ParentId: albumId,
+      Recursive: true,
+      IncludeItemTypes: 'Audio',
+      ImageTypes: 'Primary',
+      Fields: 'AlbumPrimaryImageTag',
+      ImageTypeLimit: 1,
+      EnableImageTypes: 'Primary',
+      Limit: 1,
+    });
+    const tr = r.Items[0];
+    if (!tr) return null;
+    if (tr.ImageTags?.Primary) return { imageId: tr.Id, tag: tr.ImageTags.Primary };
+    if (tr.AlbumPrimaryImageTag && tr.AlbumId) return { imageId: tr.AlbumId, tag: tr.AlbumPrimaryImageTag };
+    return null;
+  }
+
   async findAlbumVersions(album: Album): Promise<Album[]> {
     if (!album.title.trim()) return [];
     try {

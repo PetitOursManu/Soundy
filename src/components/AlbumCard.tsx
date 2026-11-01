@@ -2,6 +2,7 @@ import { memo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Album } from '../api/emby';
 import { albumPath } from '../lib/albums';
+import { useAlbumCover } from '../lib/albumCovers';
 import { hapticClick, hapticHeavy } from '../lib/haptics';
 import { useT } from '../i18n';
 import { Cover } from './Cover';
@@ -22,6 +23,7 @@ interface Props {
 export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting, selected, onToggle, onLongPress }: Props) {
   const { t } = useT();
   const isFav = useIsFavorite(album);
+  const cover = useAlbumCover(album);
   const timer = useRef<number>();
   const longPressed = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -86,7 +88,7 @@ export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting,
         )
       )}
       <div className="cover-ring">
-        <Cover imageId={album.coverId ?? (album.imageTag ? album.id : undefined)} tag={album.imageTag} alt={album.title} />
+        <Cover imageId={cover.imageId} tag={cover.tag} alt={album.title} />
       </div>
       <div className="title ellipsis">{album.title}</div>
       <div className="sub ellipsis">{album.artist}</div>

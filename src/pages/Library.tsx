@@ -96,8 +96,11 @@ export default function Library() {
     return known.length ? known.some(Boolean) : !!item.favorite;
   };
 
+  // Tri par artiste : fait par Soundy (voir EmbyClient.getAlbumsByArtist)
   const albums = usePaged<Album>(online && view === 'albums' ? `albums-${sort}${favKey}` : null, (start, signal) =>
-    client!.getAlbums({ start, sort, favorites: favOnly, signal }),
+    sort === 'artist'
+      ? client!.getAlbumsByArtist({ start, favorites: favOnly, signal })
+      : client!.getAlbums({ start, sort, favorites: favOnly, signal }),
   );
   const tracks = usePaged<Track>(online && view === 'tracks' ? `tracks-${sort}${favKey}` : null, (start, signal) =>
     client!.getTracks({ start, sort, favorites: favOnly, signal }),
