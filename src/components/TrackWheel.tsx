@@ -44,11 +44,13 @@ interface Props {
 const STEP = (18 * Math.PI) / 180; // angle entre deux titres sur le cercle
 const VISIBLE = 5; // titres rendus de chaque côté du titre centré
 const MAX_WIDTH = 540; // largeur maximale de la roue (px)
+const ITEM_RIGHT = 18; // marge droite des lignes (px), cf. .wheel-item
+const ARC_SPACE = 42; // largeur occupée par la barre courbe + respiration (px)
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
 // Barre de défilement courbe : arc (courbe de Bézier) creusé vers la gauche, comme la roue
-const ARC = { x0: 54, y0: 8, cx: -6, cy: 150, x1: 54, y1: 292 };
+const ARC = { x0: 54, y0: 8, cx: -30, cy: 150, x1: 54, y1: 292 };
 const ARC_PATH = `M ${ARC.x0} ${ARC.y0} Q ${ARC.cx} ${ARC.cy} ${ARC.x1} ${ARC.y1}`;
 function arcPoint(t: number) {
   const u = 1 - t;
@@ -72,7 +74,11 @@ function geometry(width: number) {
   const w = Math.min(width, MAX_WIDTH);
   const cover = clamp(Math.round(w * 0.25), 78, 118);
   const spacing = Math.round(cover * 1.2);
-  return { w, cover, spacing, radius: spacing / Math.sin(STEP) };
+  // Place réservée à droite pour la barre de défilement courbe : sur mobile la roue
+  // occupe toute la largeur, on raccourcit donc les lignes pour qu'elles ne passent
+  // pas sous la barre (sur grand écran, la marge autour de la roue suffit).
+  const reserve = Math.max(0, ARC_SPACE - ITEM_RIGHT - (width - w) / 2);
+  return { w, cover, spacing, radius: spacing / Math.sin(STEP), reserve };
 }
 
 interface ItemNodes {
@@ -454,7 +460,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
         }}
         style={{ ['--cover' as string]: `${geo.cover}px` }}
       >
-        <div className="wheel-track" style={{ width: geo.w }}>
+        <div className="wheel-track" style={{ width: geo.w, ['--arc-reserve' as string]: `${geo.reserve}px` }}>
           {items.map((i) => (
             <WheelItem
               key={tracks[i].id}
@@ -478,7 +484,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
       <div className="wheel-fade bottom" aria-hidden />
 
       {count > 1 && (
-        <svg className="wheel-scroll-arc" viewBox="0 0 60 300" aria-hidden>
+        <svg className="wheel-scroll-arc" viewBox="0 0 60 300" preserveAspectRatio="none" aria-hidden>
           <defs>
             <linearGradient id="wheel-thumb" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="var(--accent)" />
