@@ -8,6 +8,11 @@ on:
     branches: ['**']
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier en Release (ex. v1.0.0) — laisser vide pour une simple compilation"
+        required: false
+        default: ""
 
 permissions:
   contents: write # nécessaire pour publier la Release
@@ -53,19 +58,27 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Nom de l'APK publié
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-${GITHUB_REF_NAME}.apk"
+      - name: Version publiée
+        id: rel
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.version != ''
+        run: |
+          V="${{ inputs.version }}"
+          [ -z "$V" ] && V="${GITHUB_REF_NAME}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-$V.apk"
 
       - name: Publication de la Release GitHub
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.rel.outputs.version != ''
         uses: softprops/action-gh-release@v2
         with:
-          name: Soundy ${{ github.ref_name }}
-          files: Soundy-${{ github.ref_name }}.apk
+          tag_name: ${{ steps.rel.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: Soundy ${{ steps.rel.outputs.version }}
+          make_latest: true
+          files: Soundy-${{ steps.rel.outputs.version }}.apk
           body: |
             ## 📱 Installer Soundy sur Android
-            1. Téléchargez **Soundy-${{ github.ref_name }}.apk** ci-dessous depuis votre téléphone.
+            1. Téléchargez **Soundy-${{ steps.rel.outputs.version }}.apk** ci-dessous depuis votre téléphone.
             2. Ouvrez le fichier et autorisez l'installation depuis cette source si Android le demande.
             3. Connectez-vous avec votre compte Emby, puis indiquez l'adresse de votre serveur Soundy
                dans *Réglages → Serveur de demandes* (pour l'onglet Demandes).
