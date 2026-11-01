@@ -332,18 +332,55 @@ export class EmbyClient {
     return r.Items.map(toTrack);
   }
 
+  /**
+   * Recherche par album, par titre ET par artiste.
+   * Emby ne compare le texte qu'au nom de l'élément : « Ed Sheeran » ne trouve
+   * ni ses albums ni ses titres. On cherche donc aussi les artistes, puis on
+   * ajoute leurs albums et leurs titres aux résultats.
+   */
   async search(term: string, signal?: AbortSignal): Promise<{ albums: Album[]; tracks: Track[] }> {
-    const [albums, tracks] = await Promise.all([
-      this.items(
-        { SearchTerm: term, IncludeItemTypes: 'MusicAlbum', Recursive: true, Fields: ALBUM_FIELDS, Limit: 30, ImageTypeLimit: 1 },
-        signal,
-      ),
-      this.items(
-        { SearchTerm: term, IncludeItemTypes: 'Audio', Recursive: true, Fields: TRACK_FIELDS, Limit: 60, ImageTypeLimit: 1 },
-        signal,
-      ),
+    const base = { Recursive: true, ImageTypeLimit: 1, EnableImageTypes: 'Primary' };
+    const [albums, tracks, artistIds] = await Promise.all([
+      this.items({ ...base, SearchTerm: term, IncludeItemTypes: 'MusicAlbum', Fields: ALBUM_FIELDS, Limit: 40 }, signal),
+      this.items({ ...base, SearchTerm: term, IncludeItemTypes: 'Audio', Fields: TRACK_FIELDS, Limit: 80 }, signal),
+      this.searchArtists(term, signal),
     ]);
-    return { albums: albums.Items.map(toAlbum), tracks: tracks.Items.map(toTrack) };
+    let artistAlbums: EmbyItem[] = [];
+    let artistTracks: EmbyItem[] = [];
+    if (artistIds.length) {
+      const [a, t] = await Promise.all([
+        this.items(
+          { ...base, ArtistIds: artistIds.join(','), IncludeItemTypes: 'MusicAlbum', Fields: ALBUM_FIELDS, SortBy: 'ProductionYear,SortName', SortOrder: 'Descending', Limit: 60 },
+          signal,
+        ).catch(() => ({ Items: [] as EmbyItem[], TotalRecordCount: 0 })),
+        this.items(
+          { ...base, ArtistIds: artistIds.join(','), IncludeItemTypes: 'Audio', Fields: TRACK_FIELDS, SortBy: 'Album,ParentIndexNumber,IndexNumber', Limit: 120 },
+          signal,
+        ).catch(() => ({ Items: [] as EmbyItem[], TotalRecordCount: 0 })),
+      ]);
+      artistAlbums = a.Items;
+      artistTracks = t.Items;
+    }
+    // Correspondances sur le nom d'abord, puis le reste de l'artiste, sans doublon
+    const uniq = (list: EmbyItem[]) => {
+      const seen = new Set<string>();
+      return list.filter((i) => !seen.has(i.Id) && seen.add(i.Id));
+    };
+    return {
+      albums: uniq([...albums.Items, ...artistAlbums]).map(toAlbum),
+      tracks: uniq([...tracks.Items, ...artistTracks]).map(toTrack),
+    };
+  }
+
+  /** Identifiants des artistes dont le nom correspond (artistes et artistes d'album). */
+  private async searchArtists(term: string, signal?: AbortSignal): Promise<string[]> {
+    const qs = new URLSearchParams({ SearchTerm: term, UserId: this.session.userId, Recursive: 'true', Limit: '6' });
+    const get = (path: string) =>
+      this.request<ItemsResponse>(`${path}?${qs}`, { signal })
+        .then((r) => r.Items.map((i) => i.Id))
+        .catch(() => [] as string[]);
+    const [a, b] = await Promise.all([get('/Artists'), get('/Artists/AlbumArtists')]);
+    return [...new Set([...a, ...b])].slice(0, 8);
   }
 
   /** URL d'une pochette. */

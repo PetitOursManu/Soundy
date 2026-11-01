@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef } from 'react';
+import { HashRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { onBackButton } from './lib/backButton';
 import { BottomNav } from './components/BottomNav';
 import { MiniPlayer } from './components/MiniPlayer';
 import { Toasts } from './components/Toasts';
@@ -39,6 +40,27 @@ function Shell() {
   const location = useLocation();
   const onPlayer = location.pathname === '/player';
   const hasMini = usePlayer((s) => s.queue.length > 0);
+
+  // Bouton retour d'Android : écran précédent, ou bibliothèque, ou arrière-plan
+  const navigate = useNavigate();
+  const locRef = useRef(location);
+  locRef.current = location;
+  useEffect(
+    () =>
+      onBackButton(() => {
+        const loc = locRef.current;
+        if (loc.key !== 'default') {
+          navigate(-1);
+          return true;
+        }
+        if (loc.pathname !== '/') {
+          navigate('/', { replace: true });
+          return true;
+        }
+        return false; // écran principal → l'appli passe en arrière-plan
+      }),
+    [navigate],
+  );
 
   // Remonte en haut à chaque changement de page (sauf retour arrière géré par la page)
   useEffect(() => {

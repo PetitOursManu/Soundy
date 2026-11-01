@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { login } from '../api/emby';
+import { onBackButton } from '../lib/backButton';
 import { Brand } from '../components/Brand';
 import { IconLock, IconServer, IconUser } from '../components/Icons';
 import { useAuth } from '../store/auth';
@@ -16,6 +17,17 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Bouton retour d'Android : formulaire → écran d'accueil
+  useEffect(
+    () =>
+      onBackButton(() => {
+        if (step !== 'form') return false;
+        setStep('intro');
+        return true;
+      }),
+    [step],
+  );
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

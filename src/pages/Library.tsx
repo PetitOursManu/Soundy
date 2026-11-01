@@ -121,6 +121,13 @@ export default function Library() {
   useEffect(() => {
     if (view !== 'albums' || !online) stopSelect();
   }, [view, online]);
+  // Échap (ou bouton retour d'Android) quitte la sélection
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && stopSelect();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selecting]);
 
   const downloadSelected = async () => {
     const list = [...selected.values()];
