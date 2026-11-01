@@ -146,6 +146,31 @@ Le workflow GitHub Actions `.github/workflows/android.yml` compile l'APK à chaq
 > `SOUNDY_EMBY_URL` (adresse Emby pré-remplie) et `SOUNDY_REQUESTS_URL`
 > (adresse du serveur Soundy, ex. `https://soundy.mondomaine.fr`) pour qu'ils soient intégrés à l'APK.
 
+### Signature de l'APK (mises à jour sans perte des téléchargements)
+
+Pour qu'une mise à jour s'installe **par-dessus** l'ancienne version (et conserve les titres
+téléchargés), chaque APK doit être signé avec la **même clé**. Elle est fournie au workflow
+par deux secrets du dépôt (*Settings → Secrets and variables → Actions → New repository secret*) :
+
+| Secret | Contenu |
+|---|---|
+| `SOUNDY_KEYSTORE_BASE64` | Le fichier de clé `.jks` encodé en base64 (une seule ligne) |
+| `SOUNDY_KEYSTORE_PASSWORD` | Le mot de passe de la clé (alias `soundy`) |
+
+Sans ces secrets, l'APK est compilé avec une clé temporaire et **aucune Release n'est publiée**.
+⚠️ Ne publiez jamais la clé ni son mot de passe (le dépôt est public) et gardez-en une copie :
+si elle est perdue, la mise à jour suivante obligera à désinstaller l'appli une fois.
+
+Créer une nouvelle clé (si besoin) :
+
+```bash
+keytool -genkeypair -keystore soundy-release.jks -storetype PKCS12 -alias soundy -keyalg RSA -keysize 2048 -validity 10000
+```
+
+```bash
+base64 -w0 soundy-release.jks
+```
+
 ### Option 2 — Android Studio
 
 ```bash
