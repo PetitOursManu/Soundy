@@ -12,6 +12,8 @@ interface Settings {
   requestsUrl: string;
   /** Petites vibrations (défilement, boutons). */
   haptics: boolean;
+  /** Langue de l'interface (null = pas encore choisie : écran de choix au premier lancement). */
+  language: 'fr' | 'en' | null;
 }
 
 interface SettingsState extends Settings {
@@ -26,6 +28,7 @@ const defaults: Settings = {
   downloadQuality: 'original',
   requestsUrl: import.meta.env.VITE_REQUESTS_URL ?? '',
   haptics: true,
+  language: null,
 };
 
 function load(): Settings {
@@ -46,8 +49,9 @@ export const useSettings = create<SettingsState>((set, get) => ({
 }));
 
 export const BITRATES = [
-  { label: 'Originale (sans perte)', value: 140_000_000 },
-  { label: 'Haute — 320 kb/s', value: 320_000 },
-  { label: 'Normale — 192 kb/s', value: 192_000 },
-  { label: 'Économie — 128 kb/s', value: 128_000 },
+  // Libellés : clés de traduction (voir src/i18n)
+  { label: 'settings.bitrate.original', value: 140_000_000 },
+  { label: 'settings.bitrate.high', value: 320_000 },
+  { label: 'settings.bitrate.normal', value: 192_000 },
+  { label: 'settings.bitrate.low', value: 128_000 },
 ];

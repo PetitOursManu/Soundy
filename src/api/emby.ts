@@ -1,6 +1,7 @@
 // Client minimal pour l'API Emby.
 // Documentation : https://dev.emby.media/doc/restapi/index.html
 import { sameAlbum } from '../lib/albums';
+import { t } from '../i18n';
 
 export const APP_NAME = 'Soundy';
 export const APP_VERSION = __APP_VERSION__;
@@ -124,7 +125,7 @@ function toTrack(i: EmbyItem): Track {
   return {
     id: i.Id,
     title: i.Name,
-    artist: i.Artists?.length ? i.Artists.join(', ') : i.AlbumArtist || 'Artiste inconnu',
+    artist: i.Artists?.length ? i.Artists.join(', ') : i.AlbumArtist || t('common.unknownArtist'),
     albumArtist: i.AlbumArtist,
     album: i.Album || '',
     albumId: i.AlbumId,
@@ -140,7 +141,7 @@ function toAlbum(i: EmbyItem): Album {
   return {
     id: i.Id,
     title: i.Name,
-    artist: i.AlbumArtist || i.Artists?.[0] || 'Artistes divers',
+    artist: i.AlbumArtist || i.Artists?.[0] || t('common.variousArtists'),
     year: i.ProductionYear,
     trackCount: i.ChildCount ?? i.SongCount,
     imageTag: i.ImageTags?.Primary,
@@ -177,9 +178,7 @@ export async function resolveServer(input: string): Promise<string> {
   const base = normalizeServerUrl(input);
   if (await probe(base)) return base;
   if (!/\/emby$/i.test(base) && (await probe(`${base}/emby`))) return `${base}/emby`;
-  throw new EmbyError(
-    "Impossible de joindre le serveur Emby. Vérifiez l'adresse (et que le serveur autorise les requêtes CORS).",
-  );
+  throw new EmbyError(t('emby.unreachable'));
 }
 
 export async function login(serverInput: string, username: string, password: string): Promise<Session> {
@@ -193,8 +192,8 @@ export async function login(serverInput: string, username: string, password: str
     },
     body: JSON.stringify({ Username: username, Pw: password }),
   });
-  if (res.status === 401 || res.status === 403) throw new EmbyError('Identifiant ou mot de passe incorrect.', res.status);
-  if (!res.ok) throw new EmbyError(`Erreur du serveur (${res.status}).`, res.status);
+  if (res.status === 401 || res.status === 403) throw new EmbyError(t('emby.badCredentials'), res.status);
+  if (!res.ok) throw new EmbyError(t('emby.serverError', { status: res.status }), res.status);
   const data = await res.json();
   return {
     server,
@@ -225,8 +224,8 @@ export class EmbyClient {
       ...init,
       headers: { ...this.headers(), ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
     });
-    if (res.status === 401) throw new EmbyError('Session expirée, veuillez vous reconnecter.', 401);
-    if (!res.ok) throw new EmbyError(`Erreur Emby (${res.status})`, res.status);
+    if (res.status === 401) throw new EmbyError(t('emby.sessionExpired'), 401);
+    if (!res.ok) throw new EmbyError(t('emby.error', { status: res.status }), res.status);
     if (res.status === 204) return undefined as T;
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;

@@ -5,6 +5,7 @@ import type { DownloadedTrack } from '../lib/db';
 import { getClient } from './auth';
 import { useSettings } from './settings';
 import { toast } from './toast';
+import { t } from '../i18n';
 
 export interface DownloadTask {
   track: Track;
@@ -55,7 +56,7 @@ export const useDownloads = create<DownloadsState>((set, get) => {
     try {
       const quality = useSettings.getState().downloadQuality;
       const res = await fetch(client.downloadUrl(track.id, quality), { signal: ctrl.signal });
-      if (!res.ok) throw new Error(res.status === 403 ? 'Téléchargement non autorisé par Emby' : `Erreur ${res.status}`);
+      if (!res.ok) throw new Error(res.status === 403 ? t('downloads.forbidden') : t('downloads.error', { status: res.status }));
 
       // Lecture en flux pour afficher la progression
       const total = Number(res.headers.get('Content-Length')) || track.duration * (quality === 'mp3' ? 40_000 : 120_000);
@@ -103,8 +104,8 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       if (ctrl.signal.aborted) return;
       const msg =
         e instanceof DOMException && e.name === 'QuotaExceededError'
-          ? 'Espace de stockage insuffisant'
-          : (e as Error).message || 'Échec du téléchargement';
+          ? t('downloads.noSpace')
+          : (e as Error).message || t('downloads.failed');
       patchTask(track.id, { status: 'error', error: msg });
       toast(`${track.title} : ${msg}`, 'error');
       pump();
@@ -129,7 +130,7 @@ export const useDownloads = create<DownloadsState>((set, get) => {
       const { downloaded, tasks } = get();
       const fresh = tracks.filter((t) => !downloaded[t.id] && !tasks.some((x) => x.track.id === t.id));
       if (!fresh.length) {
-        toast('Déjà téléchargé', 'info');
+        toast(t('downloads.already'), 'info');
         return;
       }
       if (!persistAsked) {
@@ -137,7 +138,7 @@ export const useDownloads = create<DownloadsState>((set, get) => {
         navigator.storage?.persist?.().catch(() => {});
       }
       set({ tasks: [...tasks, ...fresh.map((track) => ({ track, progress: 0, status: 'queued' as const }))] });
-      toast(fresh.length > 1 ? `${fresh.length} titres ajoutés aux téléchargements` : `Téléchargement de « ${fresh[0].title} »`);
+      toast(fresh.length > 1 ? t('downloads.queuedMany', { n: fresh.length }) : t('downloads.queuedOne', { title: fresh[0].title }));
       pump();
     },
 

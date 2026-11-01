@@ -1,4 +1,5 @@
 import { Component, ReactNode } from 'react';
+import { t } from '../i18n';
 
 interface State {
   error: Error | null;
@@ -27,17 +28,17 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
       <div className="page" style={{ display: 'grid', placeItems: 'center', minHeight: '80dvh', textAlign: 'center' }}>
         <div className="card" style={{ maxWidth: 380 }}>
           <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
-            {outdated ? 'Nouvelle version disponible' : 'Oups, un problème est survenu'}
+            {outdated ? t('error.newVersion') : t('error.oops')}
           </h2>
           <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, marginBottom: 20 }}>
-            {outdated ? 'Soundy a été mis à jour. Rechargez pour utiliser la dernière version.' : this.state.error.message}
+            {outdated ? t('error.newVersionText') : this.state.error.message}
           </p>
           <div className="row" style={{ gap: 12, justifyContent: 'center' }}>
             <button className="btn" onClick={() => (window.location.hash = '#/') && this.setState({ error: null })}>
-              Accueil
+              {t('error.home')}
             </button>
             <button className="btn accent" onClick={() => window.location.reload()}>
-              Recharger
+              {t('error.reload')}
             </button>
           </div>
         </div>

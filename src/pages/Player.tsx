@@ -23,6 +23,7 @@ import { ProgressRing } from '../components/ProgressRing';
 import { QueueSheet } from '../components/QueueSheet';
 import { Slider } from '../components/Slider';
 import { TrackMenu } from '../components/TrackRow';
+import { useT } from '../i18n';
 import { formatTime } from '../lib/format';
 import { hapticClick } from '../lib/haptics';
 import { useDownloads } from '../store/downloads';
@@ -37,6 +38,7 @@ export default function Player() {
   const downloaded = useDownloads((s) => (track ? !!s.downloaded[track.id] : false));
   const task = useDownloads((s) => s.tasks.find((t) => t.track.id === track?.id));
   const online = useNetwork((s) => s.online);
+  const { t } = useT();
   const [preview, setPreview] = useState<number | null>(null);
   const [sheet, setSheet] = useState<'output' | 'queue' | 'menu' | null>(null);
   const output = useOutputLabel(sheet === 'output');
@@ -48,13 +50,13 @@ export default function Player() {
       <div className="player">
         <div className="player-inner">
           <div className="player-top">
-            <button className="icon-btn" onClick={close} aria-label="Fermer">
+            <button className="icon-btn" onClick={close} aria-label={t('player.close')}>
               <IconDown />
             </button>
           </div>
           <div className="empty" style={{ marginTop: '20vh' }}>
-            <h3>Aucune lecture en cours</h3>
-            <p>Choisissez un album ou un titre dans votre bibliothèque.</p>
+            <h3>{t('player.nothing')}</h3>
+            <p>{t('player.nothingText')}</p>
           </div>
         </div>
       </div>
@@ -68,16 +70,16 @@ export default function Player() {
     <div className="player">
       <div className="player-inner">
         <div className="player-top">
-          <button className="icon-btn" onClick={close} aria-label="Réduire le lecteur">
+          <button className="icon-btn" onClick={close} aria-label={t('player.minimize')}>
             <IconDown />
           </button>
           <div className="label">
-            En lecture
+            {t('player.nowPlaying')}
             <small>
               {index + 1} / {queue.length}
             </small>
           </div>
-          <button className="icon-btn" onClick={() => setSheet('menu')} aria-label="Options">
+          <button className="icon-btn" onClick={() => setSheet('menu')} aria-label={t('player.options')}>
             <IconMore />
           </button>
         </div>
@@ -103,11 +105,11 @@ export default function Player() {
         <span className={`source-badge ${source === 'local' ? 'local' : ''}`}>
           {source === 'local' ? (
             <>
-              <IconDownloaded /> Lecture locale
+              <IconDownloaded /> {t('player.local')}
             </>
           ) : (
             <>
-              <IconCloud /> Streaming
+              <IconCloud /> {t('player.streaming')}
             </>
           )}
         </span>
@@ -119,7 +121,7 @@ export default function Player() {
         </div>
 
         <div className="progress">
-          <Slider value={currentTime} max={duration || track.duration} onChange={seek} onPreview={setPreview} label="Position de lecture" />
+          <Slider value={currentTime} max={duration || track.duration} onChange={seek} onPreview={setPreview} label={t('player.position')} />
           <div className="times">
             <span>{formatTime(shownTime)}</span>
             <span>{formatTime(duration || track.duration)}</span>
@@ -127,22 +129,22 @@ export default function Player() {
         </div>
 
         <div className="controls">
-          <button className={`icon-btn ${shuffle ? 'active' : ''}`} onClick={() => (hapticClick(), toggleShuffle())} aria-label="Aléatoire" aria-pressed={shuffle}>
+          <button className={`icon-btn ${shuffle ? 'active' : ''}`} onClick={() => (hapticClick(), toggleShuffle())} aria-label={t('player.shuffle')} aria-pressed={shuffle}>
             <IconShuffle />
           </button>
-          <button className="icon-btn skip" onClick={() => (hapticClick(), prev())} aria-label="Précédent">
+          <button className="icon-btn skip" onClick={() => (hapticClick(), prev())} aria-label={t('player.previous')}>
             <IconPrev />
           </button>
-          <button className="icon-btn accent main" onClick={() => (hapticClick(), toggle())} aria-label={isPlaying ? 'Pause' : 'Lecture'}>
+          <button className="icon-btn accent main" onClick={() => (hapticClick(), toggle())} aria-label={isPlaying ? t('common.pause') : t('common.play')}>
             {buffering && isPlaying ? <span className="loader" /> : isPlaying ? <IconPause /> : <IconPlay style={{ marginLeft: 4 }} />}
           </button>
-          <button className="icon-btn skip" onClick={() => (hapticClick(), next())} aria-label="Suivant">
+          <button className="icon-btn skip" onClick={() => (hapticClick(), next())} aria-label={t('player.next')}>
             <IconNext />
           </button>
           <button
             className={`icon-btn ${repeat !== 'off' ? 'active' : ''}`}
             onClick={() => (hapticClick(), cycleRepeat())}
-            aria-label={repeat === 'one' ? 'Répéter le titre' : repeat === 'all' ? 'Répéter la file' : 'Répétition désactivée'}
+            aria-label={repeat === 'one' ? t('player.repeatOne') : repeat === 'all' ? t('player.repeatAll') : t('player.repeatOff')}
           >
             <RepeatIcon />
           </button>
@@ -151,7 +153,7 @@ export default function Player() {
         <div className="player-actions">
           <button
             className="icon-btn"
-            aria-label={downloaded ? 'Téléchargé' : 'Télécharger'}
+            aria-label={downloaded ? t('common.downloaded') : t('player.download')}
             disabled={!downloaded && !task && !online}
             onClick={() => (downloaded || task ? setSheet('menu') : useDownloads.getState().download([track]))}
           >
@@ -159,9 +161,9 @@ export default function Player() {
           </button>
           <button className={`output-btn ${output.label ? 'connected' : ''}`} onClick={() => setSheet('output')}>
             {output.bluetooth ? <IconBluetooth /> : <IconSpeaker />}
-            <span className="ellipsis">{output.label ?? 'Sortie audio'}</span>
+            <span className="ellipsis">{output.label ?? t('player.output')}</span>
           </button>
-          <button className="icon-btn" onClick={() => setSheet('queue')} aria-label="File d'attente">
+          <button className="icon-btn" onClick={() => setSheet('queue')} aria-label={t('player.queue')}>
             <IconQueue />
           </button>
         </div>

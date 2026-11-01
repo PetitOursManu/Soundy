@@ -6,7 +6,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MiniPlayer } from './components/MiniPlayer';
 import { Toasts } from './components/Toasts';
 import Library from './pages/Library';
+import LanguagePicker from './pages/LanguagePicker';
 import Login from './pages/Login';
+import { currentLang, t } from './i18n';
 import { useAuth } from './store/auth';
 import { useDownloads } from './store/downloads';
 import { usePlayer } from './store/player';
@@ -95,7 +97,13 @@ function Shell() {
 
 export default function App() {
   const session = useAuth((s) => s.session);
+  const language = useSettings((s) => s.language);
   useTheme();
+
+  // Langue du document (lecteurs d'écran, césure…)
+  useEffect(() => {
+    document.documentElement.lang = currentLang();
+  }, [language]);
 
   useEffect(() => {
     void useDownloads.getState().init();
@@ -105,7 +113,7 @@ export default function App() {
   useEffect(() => {
     const onError = (e: PromiseRejectionEvent) => {
       if (e.reason instanceof EmbyError && e.reason.status === 401) {
-        toast('Session expirée, veuillez vous reconnecter.', 'error');
+        toast(t('emby.sessionExpired'), 'error');
         useAuth.getState().logout();
       }
     };
@@ -116,7 +124,9 @@ export default function App() {
   return (
     <div className="app">
       <Toasts />
-      {session ? (
+      {!language ? (
+        <LanguagePicker />
+      ) : session ? (
         <HashRouter>
           <Shell />
         </HashRouter>

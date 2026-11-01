@@ -9,6 +9,7 @@ import { Cover } from './Cover';
 import { IconDisc, IconDownload, IconDownloaded, IconMore, IconPause, IconPlay, IconPlayNext, IconQueue, IconTrash, IconX } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { MenuItem, Sheet } from './Sheet';
+import { useT } from '../i18n';
 
 interface Props {
   track: Track;
@@ -26,6 +27,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
   const task = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id));
   const online = useNetwork((s) => s.online);
   const [menu, setMenu] = useState(false);
+  const { t } = useT();
   const unavailable = !online && !downloaded;
 
   const play = () => {
@@ -65,7 +67,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
             {task ? (
               <ProgressRing value={task.progress} size={13} />
             ) : (
-              downloaded && <IconDownloaded aria-label="Téléchargé" />
+              downloaded && <IconDownloaded aria-label={t('common.downloaded')} />
             )}
             <span className="ellipsis">{showAlbum && track.album ? `${track.artist} · ${track.album}` : track.artist}</span>
           </div>
@@ -73,7 +75,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
         <span className="dur">{formatTime(track.duration)}</span>
         <button
           className="icon-btn sm flat"
-          aria-label="Plus d'options"
+          aria-label={t('common.more')}
           onClick={(e) => {
             e.stopPropagation();
             setMenu(true);
@@ -83,7 +85,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
         </button>
         <button
           className="play"
-          aria-label={isCurrent && isPlaying ? 'Pause' : 'Lire'}
+          aria-label={isCurrent && isPlaying ? t('common.pause') : t('common.play')}
           onClick={(e) => {
             e.stopPropagation();
             play();
@@ -104,6 +106,7 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
   const task = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id));
   const { download, remove, cancel } = useDownloads.getState();
   const online = useNetwork((s) => s.online);
+  const { t } = useT();
   const run = (fn: () => void) => () => {
     fn();
     onClose();
@@ -111,23 +114,23 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
 
   return (
     <Sheet open onClose={onClose} title={track.title} description={`${track.artist}${track.album ? ` · ${track.album}` : ''}`}>
-      <MenuItem icon={<IconPlayNext />} label="Lire ensuite" onClick={run(() => addNext([track]))} />
-      <MenuItem icon={<IconQueue />} label="Ajouter à la file d'attente" onClick={run(() => addToQueue([track]))} />
+      <MenuItem icon={<IconPlayNext />} label={t('track.playNext')} onClick={run(() => addNext([track]))} />
+      <MenuItem icon={<IconQueue />} label={t('track.addToQueue')} onClick={run(() => addToQueue([track]))} />
       {downloaded ? (
-        <MenuItem icon={<IconTrash />} label="Supprimer de l'appareil" danger onClick={run(() => void remove([track.id]))} />
+        <MenuItem icon={<IconTrash />} label={t('track.remove')} danger onClick={run(() => void remove([track.id]))} />
       ) : task ? (
-        <MenuItem icon={<IconX />} label="Annuler le téléchargement" onClick={run(() => cancel(track.id))} />
+        <MenuItem icon={<IconX />} label={t('track.cancelDownload')} onClick={run(() => cancel(track.id))} />
       ) : (
         <MenuItem
           icon={<IconDownload />}
-          label="Télécharger sur l'appareil"
-          hint="Pour l'écouter hors ligne"
+          label={t('track.download')}
+          hint={t('track.downloadHint')}
           disabled={!online}
           onClick={run(() => download([track]))}
         />
       )}
       {track.albumId && (
-        <MenuItem icon={<IconDisc />} label="Voir l'album" onClick={run(() => navigate(`/album/${track.albumId}`))} />
+        <MenuItem icon={<IconDisc />} label={t('track.goToAlbum')} onClick={run(() => navigate(`/album/${track.albumId}`))} />
       )}
     </Sheet>
   );

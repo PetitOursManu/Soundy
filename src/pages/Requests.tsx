@@ -4,6 +4,7 @@ import { Empty } from '../components/Empty';
 import { IconAlert, IconCheck, IconDisc, IconInbox, IconMusic, IconPlus, IconSend, IconServer, IconTrash, IconUser, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
+import { currentLocale, Key, t, tn } from '../i18n';
 import { isNative } from '../lib/native';
 import { useAuth } from '../store/auth';
 import { useNetwork } from '../store/network';
@@ -12,26 +13,26 @@ import { toast } from '../store/toast';
 
 type Tab = 'new' | 'mine' | 'admin';
 
-const STATUS_LABEL: Record<RequestStatus, string> = {
-  pending: 'En attente',
-  added: 'Ajoutée',
-  refused: 'Refusée',
+const STATUS_LABEL: Record<RequestStatus, Key> = {
+  pending: 'requests.status.pending',
+  added: 'requests.status.added',
+  refused: 'requests.status.refused',
 };
 
-const STATUS_FILTER: Record<RequestStatus, string> = {
-  pending: 'En attente',
-  added: 'Ajoutées',
-  refused: 'Refusées',
+const STATUS_FILTER: Record<RequestStatus, Key> = {
+  pending: 'requests.filter.pending',
+  added: 'requests.filter.added',
+  refused: 'requests.filter.refused',
 };
 
 function timeAgo(iso: string) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  const rtf = new Intl.RelativeTimeFormat('fr', { numeric: 'auto' });
-  if (diff < 60) return "à l'instant";
+  const rtf = new Intl.RelativeTimeFormat(currentLocale(), { numeric: 'auto' });
+  if (diff < 60) return t('requests.justNow');
   if (diff < 3600) return rtf.format(-Math.round(diff / 60), 'minute');
   if (diff < 86400) return rtf.format(-Math.round(diff / 3600), 'hour');
   if (diff < 86400 * 30) return rtf.format(-Math.round(diff / 86400), 'day');
-  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString(currentLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export default function Requests() {
@@ -65,25 +66,25 @@ export default function Requests() {
 
   const pendingAdmin = all?.filter((r) => r.status === 'pending').length ?? 0;
   const tabs = [
-    { value: 'new' as Tab, label: 'Nouvelle' },
-    { value: 'mine' as Tab, label: session.isAdmin ? 'Les miennes' : 'Mes demandes' },
-    ...(session.isAdmin ? [{ value: 'admin' as Tab, label: 'Gestion', count: pendingAdmin }] : []),
+    { value: 'new' as Tab, label: t('requests.tabNew') },
+    { value: 'mine' as Tab, label: session.isAdmin ? t('requests.tabMineAdmin') : t('requests.tabMine') },
+    ...(session.isAdmin ? [{ value: 'admin' as Tab, label: t('requests.tabAdmin'), count: pendingAdmin }] : []),
   ];
 
   return (
     <div className="page">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Demandes</h1>
-          <p className="page-subtitle">Un album ou un titre vous manque ? Demandez-le à l'administrateur.</p>
+          <h1 className="page-title">{t('requests.title')}</h1>
+          <p className="page-subtitle">{t('requests.subtitle')}</p>
         </div>
       </header>
 
-      <Segmented<Tab> label="Demandes" value={tab} onChange={setTab} options={tabs} />
+      <Segmented<Tab> label={t('requests.title')} value={tab} onChange={setTab} options={tabs} />
 
       <div style={{ marginTop: 24 }}>
         {!online ? (
-          <Empty icon={<IconAlert />} title="Hors ligne" text="Les demandes nécessitent une connexion Internet." />
+          <Empty icon={<IconAlert />} title={t('common.offline')} text={t('requests.offlineText')} />
         ) : needsSetup || error ? (
           <ServerSetup error={needsSetup ? null : error} onRetry={() => void refresh()} />
         ) : tab === 'new' ? (
@@ -98,7 +99,7 @@ export default function Requests() {
         ) : tab === 'mine' ? (
           <RequestList
             items={mine}
-            emptyText="Vous n'avez encore fait aucune demande."
+            emptyText={t('requests.noneText')}
             onDelete={async (r) => {
               await api.remove(r.id);
               setMine((m) => m?.filter((x) => x.id !== r.id) ?? null);
@@ -140,7 +141,7 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
     e.preventDefault();
     let base = url.trim().replace(/\/+$/, '');
     if (base && !/^https?:\/\//i.test(base)) base = `https://${base}`;
-    if (!base) return setMsg("Indiquez l'adresse du serveur Soundy.");
+    if (!base) return setMsg(t('requests.serverMissing'));
     setTesting(true);
     setMsg(null);
     try {
@@ -148,10 +149,10 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.name !== 'soundy') throw new Error();
       update({ requestsUrl: base });
-      toast('Serveur de demandes enregistré ✓', 'success');
+      toast(t('requests.serverSaved'), 'success');
       onRetry();
     } catch {
-      setMsg(`Aucun serveur Soundy trouvé à « ${base} ».`);
+      setMsg(t('requests.serverNotFound', { url: base }));
     } finally {
       setTesting(false);
     }
@@ -159,14 +160,14 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
 
   return (
     <form className="card" onSubmit={save} style={{ padding: 22 }}>
-      <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{error ? 'Service de demandes indisponible' : 'Serveur de demandes'}</h3>
+      <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{error ? t('requests.serverUnavailable') : t('requests.serverTitle')}</h3>
       <p className="muted" style={{ fontSize: 14, lineHeight: 1.5, marginBottom: 18 }}>
         {error
-          ? `${error} Vérifiez l'adresse ci-dessous.`
-          : "Indiquez l'adresse de votre serveur Soundy (celle de la version web, ex. https://soundy.mondomaine.fr)."}
+          ? t('requests.serverCheck', { error })
+          : t('requests.serverHelp')}
       </p>
       <div className="field">
-        <label htmlFor="rq-server">Adresse du serveur Soundy</label>
+        <label htmlFor="rq-server">{t('requests.serverAddress')}</label>
         <div className="input-wrap">
           <IconServer />
           <input
@@ -175,7 +176,7 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
             inputMode="url"
             autoCapitalize="off"
             spellCheck={false}
-            placeholder="https://soundy.mondomaine.fr"
+            placeholder="https://soundy.example.com"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
@@ -188,11 +189,11 @@ function ServerSetup({ error, onRetry }: { error: string | null; onRetry: () => 
       )}
       <div className="row" style={{ gap: 12 }}>
         <button className="btn accent" type="submit" disabled={testing} style={{ flex: 1 }}>
-          {testing ? <span className="loader" style={{ width: 18, height: 18 }} /> : 'Enregistrer'}
+          {testing ? <span className="loader" style={{ width: 18, height: 18 }} /> : t('common.save')}
         </button>
         {error && (
           <button className="btn" type="button" onClick={onRetry}>
-            Réessayer
+            {t('common.retry')}
           </button>
         )}
       </div>
@@ -217,9 +218,9 @@ function RequestForm({ api, onCreated }: { api: RequestsApi; onCreated: (r: Musi
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
-    if (!artist.trim()) return setErr("Indiquez le nom de l'artiste.");
-    if (type === 'album' && !album.trim()) return setErr("Indiquez le nom de l'album.");
-    if (type === 'tracks' && !cleanTracks.length) return setErr('Indiquez au moins un titre.');
+    if (!artist.trim()) return setErr(t('requests.needArtist'));
+    if (type === 'album' && !album.trim()) return setErr(t('requests.needAlbum'));
+    if (type === 'tracks' && !cleanTracks.length) return setErr(t('requests.needTrack'));
     const req: NewRequest = {
       type,
       artist: artist.trim(),
@@ -230,7 +231,7 @@ function RequestForm({ api, onCreated }: { api: RequestsApi; onCreated: (r: Musi
     setSending(true);
     try {
       const created = await api.create(req);
-      toast("Demande envoyée à l'administrateur 🎶", 'success');
+      toast(t('requests.sent'), 'success');
       setArtist('');
       setAlbum('');
       setTracks(['']);
@@ -249,76 +250,76 @@ function RequestForm({ api, onCreated }: { api: RequestsApi; onCreated: (r: Musi
   return (
     <form className="card" onSubmit={submit} style={{ padding: 22 }}>
       <div className="field">
-        <span className="field-label">Je souhaite</span>
+        <span className="field-label">{t('requests.iWant')}</span>
         <Segmented<RequestType>
-          label="Type de demande"
+          label={t('requests.type')}
           value={type}
           onChange={setType}
           options={[
-            { value: 'album', label: 'Un album', icon: <IconDisc /> },
-            { value: 'tracks', label: 'Des titres', icon: <IconMusic /> },
+            { value: 'album', label: t('requests.typeAlbum'), icon: <IconDisc /> },
+            { value: 'tracks', label: t('requests.typeTracks'), icon: <IconMusic /> },
           ]}
         />
       </div>
 
       <div className="field">
-        <label htmlFor="rq-artist">Artiste</label>
+        <label htmlFor="rq-artist">{t('requests.artist')}</label>
         <div className="input-wrap">
           <IconUser />
-          <input id="rq-artist" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Ex : Daft Punk" maxLength={120} autoComplete="off" />
+          <input id="rq-artist" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Daft Punk" maxLength={120} autoComplete="off" />
         </div>
       </div>
 
       <div className="field">
-        <label htmlFor="rq-album">{type === 'album' ? 'Album' : 'Album (facultatif)'}</label>
+        <label htmlFor="rq-album">{type === 'album' ? t('requests.album') : t('requests.albumOptional')}</label>
         <div className="input-wrap">
           <IconDisc />
-          <input id="rq-album" value={album} onChange={(e) => setAlbum(e.target.value)} placeholder="Ex : Random Access Memories" maxLength={160} autoComplete="off" />
+          <input id="rq-album" value={album} onChange={(e) => setAlbum(e.target.value)} placeholder="Random Access Memories" maxLength={160} autoComplete="off" />
         </div>
       </div>
 
       {type === 'tracks' && (
         <div className="field">
-          <span className="field-label">Titres</span>
-          {tracks.map((t, i) => (
+          <span className="field-label">{t('requests.tracks')}</span>
+          {tracks.map((name, i) => (
             <div className="input-wrap" key={i}>
               <span style={{ fontSize: 13, fontWeight: 700, width: 18, textAlign: 'center' }}>{i + 1}</span>
               <input
-                value={t}
+                value={name}
                 onChange={(e) => setTrack(i, e.target.value)}
-                placeholder="Nom du titre"
+                placeholder={t('requests.trackName')}
                 maxLength={160}
                 autoComplete="off"
-                aria-label={`Titre ${i + 1}`}
+                aria-label={t('requests.trackN', { n: i + 1 })}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
-                    if (t.trim() && i === tracks.length - 1) addTrack();
+                    if (name.trim() && i === tracks.length - 1) addTrack();
                   }
                 }}
-                autoFocus={i > 0 && i === tracks.length - 1 && !t}
+                autoFocus={i > 0 && i === tracks.length - 1 && !name}
               />
               {tracks.length > 1 && (
-                <button type="button" className="icon-btn sm flat" aria-label="Retirer" onClick={() => setTracks((x) => x.filter((_, j) => j !== i))}>
+                <button type="button" className="icon-btn sm flat" aria-label={t('requests.removeTrack')} onClick={() => setTracks((x) => x.filter((_, j) => j !== i))}>
                   <IconX />
                 </button>
               )}
             </div>
           ))}
           <button type="button" className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 4 }} onClick={addTrack} disabled={tracks.length >= 30}>
-            <IconPlus /> Ajouter un titre
+            <IconPlus /> {t('requests.addTrack')}
           </button>
         </div>
       )}
 
       <div className="field">
-        <label htmlFor="rq-comment">Commentaire (facultatif)</label>
+        <label htmlFor="rq-comment">{t('requests.comment')}</label>
         <textarea
           id="rq-comment"
           className="textarea"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Version, édition, lien… tout ce qui peut aider l'administrateur"
+          placeholder={t('requests.commentPlaceholder')}
           maxLength={500}
         />
       </div>
@@ -331,7 +332,7 @@ function RequestForm({ api, onCreated }: { api: RequestsApi; onCreated: (r: Musi
 
       <button className="btn accent block" type="submit" disabled={sending}>
         {sending ? <span className="loader" style={{ width: 18, height: 18 }} /> : <IconSend />}
-        Envoyer la demande
+        {t('requests.send')}
       </button>
     </form>
   );
@@ -349,14 +350,14 @@ function RequestCard({ r, showUser, children }: { r: MusicRequest; showUser?: bo
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 15 }}>
-            {r.type === 'album' ? r.album : `${r.tracks.length} titre${r.tracks.length > 1 ? 's' : ''}`}
+            {r.type === 'album' ? r.album : tn('common.tracks', r.tracks.length)}
           </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
             {r.artist}
             {r.type === 'tracks' && r.album ? ` · ${r.album}` : ''}
           </div>
         </div>
-        <span className={`badge ${r.status}`}>{STATUS_LABEL[r.status]}</span>
+        <span className={`badge ${r.status}`}>{t(STATUS_LABEL[r.status])}</span>
       </div>
 
       {r.type === 'tracks' && (
@@ -373,7 +374,7 @@ function RequestCard({ r, showUser, children }: { r: MusicRequest; showUser?: bo
       )}
       {r.adminNote && (
         <div className="neu-inset" style={{ marginTop: 12, padding: '10px 14px', borderRadius: 14, fontSize: 13, lineHeight: 1.5 }}>
-          <strong>Réponse de l'admin :</strong> {r.adminNote}
+          <strong>{t('requests.adminReply')}</strong> {r.adminNote}
         </div>
       )}
       <div className="row" style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', fontWeight: 600, paddingLeft: 52, gap: 6 }}>
@@ -391,7 +392,7 @@ function RequestCard({ r, showUser, children }: { r: MusicRequest; showUser?: bo
 
 function RequestList({ items, emptyText, onDelete }: { items: MusicRequest[] | null; emptyText: string; onDelete: (r: MusicRequest) => Promise<void> }) {
   if (!items) return <ListSkeleton />;
-  if (!items.length) return <Empty icon={<IconInbox />} title="Aucune demande" text={emptyText} />;
+  if (!items.length) return <Empty icon={<IconInbox />} title={t('requests.none')} text={emptyText} />;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {items.map((r) => (
@@ -399,7 +400,7 @@ function RequestList({ items, emptyText, onDelete }: { items: MusicRequest[] | n
           {r.status === 'pending' && (
             <div style={{ textAlign: 'right', marginTop: 10 }}>
               <button className="btn sm danger" onClick={() => onDelete(r).catch((e) => toast((e as Error).message, 'error'))}>
-                <IconTrash /> Annuler la demande
+                <IconTrash /> {t('requests.cancelRequest')}
               </button>
             </div>
           )}
@@ -430,7 +431,7 @@ function AdminList({
     if (!editing) return;
     try {
       await onUpdate(editing.r, editing.status, note.trim() || undefined);
-      toast(editing.status === 'added' ? 'Demande marquée comme ajoutée' : 'Demande refusée', 'success');
+      toast(editing.status === 'added' ? t('requests.markedAdded') : t('requests.markedRefused'), 'success');
       setEditing(null);
     } catch (e) {
       toast((e as Error).message, 'error');
@@ -442,18 +443,18 @@ function AdminList({
       <div className="chips">
         {(['pending', 'added', 'refused', 'all'] as const).map((s) => (
           <button key={s} className={`chip ${filter === s ? 'on' : ''}`} onClick={() => setFilter(s)}>
-            {s === 'all' ? `Toutes (${items.length})` : `${STATUS_FILTER[s]} (${count(s)})`}
+            {s === 'all' ? t('requests.filter.all', { n: items.length }) : `${t(STATUS_FILTER[s])} (${count(s)})`}
           </button>
         ))}
       </div>
       {!shown.length ? (
-        <Empty icon={<IconInbox />} title="Rien à traiter" text="Aucune demande dans cette catégorie." />
+        <Empty icon={<IconInbox />} title={t('requests.nothing')} text={t('requests.nothingText')} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 10 }}>
           {shown.map((r) => (
             <RequestCard key={r.id} r={r} showUser>
               <div className="row" style={{ marginTop: 14, gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                <button className="btn sm danger" aria-label="Supprimer" onClick={() => onDelete(r).catch((e) => toast((e as Error).message, 'error'))}>
+                <button className="btn sm danger" aria-label={t('common.delete')} onClick={() => onDelete(r).catch((e) => toast((e as Error).message, 'error'))}>
                   <IconTrash />
                 </button>
                 {r.status !== 'refused' && (
@@ -464,7 +465,7 @@ function AdminList({
                       setEditing({ r, status: 'refused' });
                     }}
                   >
-                    <IconX /> Refuser
+                    <IconX /> {t('requests.refuse')}
                   </button>
                 )}
                 {r.status !== 'added' && (
@@ -475,7 +476,7 @@ function AdminList({
                       setEditing({ r, status: 'added' });
                     }}
                   >
-                    <IconCheck /> Ajoutée
+                    <IconCheck /> {t('requests.markAdded')}
                   </button>
                 )}
               </div>
@@ -487,22 +488,22 @@ function AdminList({
       <Sheet
         open={!!editing}
         onClose={() => setEditing(null)}
-        title={editing?.status === 'added' ? 'Marquer comme ajoutée' : 'Refuser la demande'}
-        description={editing ? `${editing.r.artist}${editing.r.album ? ` — ${editing.r.album}` : ''} · demandé par ${editing.r.userName}` : ''}
+        title={editing?.status === 'added' ? t('requests.markAddedTitle') : t('requests.refuseTitle')}
+        description={editing ? `${editing.r.artist}${editing.r.album ? ` — ${editing.r.album}` : ''} · ${t('requests.requestedBy', { user: editing.r.userName })}` : ''}
       >
         <div className="field">
-          <label htmlFor="admin-note">Message pour l'utilisateur (facultatif)</label>
+          <label htmlFor="admin-note">{t('requests.noteLabel')}</label>
           <textarea
             id="admin-note"
             className="textarea"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             maxLength={500}
-            placeholder={editing?.status === 'added' ? 'Ex : Ajouté, bonne écoute !' : 'Ex : Introuvable en bonne qualité'}
+            placeholder={editing?.status === 'added' ? t('requests.notePlaceholderAdded') : t('requests.notePlaceholderRefused')}
           />
         </div>
         <button className={`btn block ${editing?.status === 'added' ? 'accent' : 'danger'}`} onClick={() => void save()}>
-          Confirmer
+          {t('common.confirm')}
         </button>
       </Sheet>
     </>

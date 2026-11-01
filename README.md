@@ -1,18 +1,22 @@
 <p align="center">
+  <b>🇫🇷 Français</b> &nbsp;·&nbsp; <a href="README.en.md">🇬🇧 English</a>
+</p>
+
+<p align="center">
   <img src="docs/logo.webp" alt="Soundy" width="520">
 </p>
 
 <p align="center">
   <b>Le lecteur de musique neumorphique pour votre serveur Emby</b><br>
-  Application web installable (PWA) &nbsp;·&nbsp; Application Android &nbsp;·&nbsp; Lecture hors ligne
+  Application web installable (PWA) &nbsp;·&nbsp; Application Android &nbsp;·&nbsp; Lecture hors ligne &nbsp;·&nbsp; Français / anglais
 </p>
 
 <p align="center">
   <a href="https://github.com/PetitOursManu/Soundy/releases/latest"><b>📱 Télécharger l'APK Android</b></a>
   &nbsp;·&nbsp;
-  <a href="#-installation-sur-coolify"><b>☁️ Installer la version web</b></a>
+  <a href="#installation-coolify"><b>☁️ Installer la version web</b></a>
   &nbsp;·&nbsp;
-  <a href="#-nouveautés"><b>🆕 Nouveautés</b></a>
+  <a href="#nouveautes"><b>🆕 Nouveautés</b></a>
 </p>
 
 ---
@@ -69,15 +73,19 @@
 | 🎧 Bluetooth | Casque / enceinte Bluetooth, nom de l'appareil connecté (Android), choix de la sortie (navigateur), boutons du casque / de la voiture. Lecture **écran éteint** avec notification de contrôle (Android). |
 | 📳 Vibrations | Petit retour haptique en défilant les titres et sur les boutons (désactivable). |
 | 📨 Demandes | Demander à l'admin l'ajout d'**un album entier** ou de **plusieurs titres** ; l'admin les valide / refuse avec un message. Notification Discord / Slack / Gotify possible. |
+| 🌍 Langues | **Français et anglais**, au choix dès le premier lancement, modifiable dans les Réglages et sur l'écran de connexion. |
 | 🌗 Thème | Clair, sombre ou automatique, style neumorphique. |
 | 🔄 Mises à jour | Release GitHub automatique à chaque nouvelle version ; l'APK s'installe **par-dessus** la précédente (téléchargements conservés). |
 
 ---
 
+<a id="nouveautes"></a>
+
 ## 🆕 Nouveautés
 
 | Version | Changements |
 |---|---|
+| **1.3.0** | **Version anglaise** de l'appli : choix de la langue au premier lancement, dans les Réglages et sur l'écran de connexion (interface, notification Android, messages d'erreur du serveur). README en anglais. |
 | **1.2.2** | Nouveau logo (icônes, écran de démarrage, en-tête). Défilement tactile rétabli quand le doigt commence sur une carte d'album. |
 | **1.2.1** | Plus d'effet d'étirement / de rebond en haut et en bas des pages. |
 | **1.2.0** | Vibrations douces (roue, boutons, appuis longs). Page Demandes corrigée dans l'appli Android (saisie de l'adresse du serveur sur la page). Écran de démarrage net, connexion sans défilement, mini lecteur et boutons du lecteur plus aérés, bras de la platine sur le vinyle, albums rangés par artiste. |
@@ -126,6 +134,7 @@ On se connecte avec un **compte utilisateur Emby** :
 src/
   api/emby.ts          Client de l'API Emby (connexion, albums, titres, recherche, flux audio)
   api/requests.ts      Client de l'API des demandes
+  i18n/                Traductions (fr.ts, en.ts) — la compilation échoue s'il manque une clé anglaise
   store/player.ts      Lecteur (file d'attente, aléatoire, répétition, lecture locale prioritaire, MediaSession)
   store/downloads.ts   Gestionnaire de téléchargements (file, progression, stockage)
   lib/db.ts            Stockage IndexedDB (audio, pochettes, métadonnées)
@@ -134,13 +143,15 @@ src/
   lib/haptics.ts       Vibrations (retour haptique)
   lib/backButton.ts    Bouton retour d'Android
   components/TrackWheel.tsx  Navigation en roue (molette, clavier, glisser)
-  pages/               Bibliothèque, Album, Lecteur, Recherche, Demandes, Réglages
+  pages/               Bibliothèque, Album, Lecteur, Recherche, Demandes, Réglages, choix de la langue
   styles/global.css    Design system neumorphique (thèmes clair / sombre)
 server/index.js        Serveur Soundy (Express)
 android/               Projet Android (Capacitor) + plugin natif SoundyAudio
 ```
 
 ---
+
+<a id="installation-coolify"></a>
 
 ## ☁️ Installation sur Coolify
 
@@ -205,7 +216,7 @@ EMBY_URL=http://localhost:8096 node server/index.js
 
 Ouvrez la page **Releases** du dépôt et téléchargez `Soundy-vX.Y.Z.apk` depuis le téléphone.
 Une nouvelle Release est publiée automatiquement à chaque nouvelle version arrivée sur `main` :
-il suffit d'augmenter `"version"` dans `package.json` (ex. `1.0.0` → `1.1.0`).
+il suffit d'augmenter `"version"` dans `package.json` (ex. `1.2.0` → `1.3.0`).
 
 ### Option 1 bis — APK de test (chaque push)
 
@@ -261,6 +272,7 @@ Puis *Build → Build APK(s)*.
 - **Serveur de demandes** : à la première ouverture de l'onglet *Demandes*, indiquez l'adresse de votre serveur Soundy (celle de la version web). Modifiable ensuite dans *Réglages → Serveur de demandes*.
 - **Bouton retour** : ferme la fenêtre ou la sélection ouverte, revient à l'écran précédent, puis met l'appli en arrière-plan (la musique continue).
 - **Vibrations** : retour haptique du système (suit le réglage de vibration du téléphone), désactivable dans *Réglages → Vibrations*.
+- **Langue** : français ou anglais, choisi au premier lancement ; la notification de lecture suit la langue choisie.
 - **Mises à jour** : installez le nouvel APK par-dessus l'ancien, les titres téléchargés sont conservés.
 - Un serveur Emby en `http://` (réseau local) est accepté.
 
@@ -274,6 +286,11 @@ cp .env.example .env         # facultatif
 npm run server &             # API des demandes sur :8080 (EMBY_URL à définir)
 npm run dev                  # application sur http://localhost:5173 (proxy /api → :8080)
 ```
+
+### Ajouter ou modifier un texte
+
+Tous les textes sont dans `src/i18n/fr.ts` (référence) et `src/i18n/en.ts`. Ajoutez la clé dans les deux
+fichiers : la compilation TypeScript échoue s'il manque une traduction anglaise.
 
 ---
 

@@ -1,5 +1,6 @@
 // Client du serveur de demandes Soundy (voir /server).
 import type { Session } from './emby';
+import { currentLang, t } from '../i18n';
 
 export type RequestType = 'album' | 'tracks';
 export type RequestStatus = 'pending' | 'added' | 'refused';
@@ -40,23 +41,24 @@ export class RequestsApi {
           'Content-Type': 'application/json',
           'X-Emby-Token': this.session.token,
           'X-Emby-UserId': this.session.userId,
+          'Accept-Language': currentLang(),
           ...init.headers,
         },
       });
     } catch {
-      throw new Error('Serveur de demandes injoignable.');
+      throw new Error(t('requests.unreachable'));
     }
     // Une page HTML (et non du JSON) = ce n'est pas le serveur Soundy à cette adresse
     const isJson = (res.headers.get('Content-Type') || '').includes('application/json');
-    if (!isJson) throw new Error("Aucun serveur Soundy à cette adresse.");
+    if (!isJson) throw new Error(t('requests.notSoundy'));
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || `Erreur ${res.status}`);
+    if (!res.ok) throw new Error(data?.error || t('requests.error', { status: res.status }));
     return data as T;
   }
 
   async list(scope: 'mine' | 'all') {
     const data = await this.call<MusicRequest[]>(`/requests?scope=${scope}`);
-    if (!Array.isArray(data)) throw new Error('Réponse inattendue du serveur de demandes.');
+    if (!Array.isArray(data)) throw new Error(t('requests.unexpected'));
     return data;
   }
 

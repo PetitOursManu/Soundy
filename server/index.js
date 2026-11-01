@@ -38,6 +38,34 @@ if (!EMBY_URL) {
 }
 
 // ----------------------------------------------------------------------------
+// Messages d'erreur (français / anglais selon l'en-tête Accept-Language)
+// ----------------------------------------------------------------------------
+const MESSAGES = {
+  authRequired: ['Authentification requise.', 'Authentication required.'],
+  misconfigured: ['Serveur mal configuré (EMBY_URL manquant).', 'Server misconfigured (EMBY_URL missing).'],
+  embyUnreachable: ['Serveur Emby injoignable.', 'Emby server unreachable.'],
+  invalidSession: ['Session Emby invalide.', 'Invalid Emby session.'],
+  adminOnly: ['Réservé aux administrateurs.', 'Administrators only.'],
+  badType: ['Type de demande invalide.', 'Invalid request type.'],
+  needArtist: ["Le nom de l'artiste est obligatoire.", 'The artist name is required.'],
+  needAlbum: ["Le nom de l'album est obligatoire.", 'The album name is required.'],
+  needTrack: ['Indiquez au moins un titre.', 'Enter at least one track.'],
+  tooMany: ['Vous avez déjà {n} demandes en attente. Patientez un peu 🙂', 'You already have {n} pending requests. Please wait a little 🙂'],
+  notFound: ['Demande introuvable.', 'Request not found.'],
+  badStatus: ['Statut invalide.', 'Invalid status.'],
+  forbidden: ['Action non autorisée.', 'Action not allowed.'],
+  unknownRoute: ['Route inconnue.', 'Unknown route.'],
+};
+
+function msg(req, key, vars = {}) {
+  const en = /^en/i.test(req.get('Accept-Language') || '');
+  return MESSAGES[key][en ? 1 : 0].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+}
+
+/** Erreur portant une clé de message traduisible. */
+const fail = (key, status) => Object.assign(new Error(key), { key, status });
+
+// ----------------------------------------------------------------------------
 // Stockage JSON (écriture atomique, sérialisée)
 // ----------------------------------------------------------------------------
 let requests = [];
@@ -71,7 +99,7 @@ function saveStore() {
 const authCache = new Map(); // token → { user, expires }
 
 async function verifyUser(token, userId) {
-  if (!EMBY_URL) throw Object.assign(new Error('Serveur mal configuré (EMBY_URL manquant).'), { status: 500 });
+  if (!EMBY_URL) throw fail('misconfigured', 500);
   const key = `${token}:${userId}`;
   const cached = authCache.get(key);
   if (cached && cached.expires > Date.now()) return cached.user;
@@ -80,10 +108,10 @@ async function verifyUser(token, userId) {
     headers: { 'X-Emby-Token': token },
     signal: AbortSignal.timeout(8000),
   }).catch(() => null);
-  if (!res) throw Object.assign(new Error('Serveur Emby injoignable.'), { status: 502 });
-  if (!res.ok) throw Object.assign(new Error('Session Emby invalide.'), { status: 401 });
+  if (!res) throw fail('embyUnreachable', 502);
+  if (!res.ok) throw fail('invalidSession', 401);
   const data = await res.json();
-  if (data.Id !== userId) throw Object.assign(new Error('Session Emby invalide.'), { status: 401 });
+  if (data.Id !== userId) throw fail('invalidSession', 401);
 
   const user = { id: data.Id, name: data.Name, isAdmin: !!data.Policy?.IsAdministrator };
   authCache.set(key, { user, expires: Date.now() + 5 * 60_000 });
@@ -94,12 +122,12 @@ async function verifyUser(token, userId) {
 async function auth(req, res, next) {
   const token = req.get('X-Emby-Token');
   const userId = req.get('X-Emby-UserId');
-  if (!token || !userId) return res.status(401).json({ error: 'Authentification requise.' });
+  if (!token || !userId) return res.status(401).json({ error: msg(req, 'authRequired') });
   try {
     req.user = await verifyUser(token, userId);
     next();
   } catch (e) {
-    res.status(e.status || 500).json({ error: e.message });
+    res.status(e.status || 500).json({ error: e.key ? msg(req, e.key) : e.message });
   }
 }
 
@@ -133,14 +161,14 @@ const str = (v, max) => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').s
 
 function validateNew(body) {
   const type = body?.type === 'tracks' ? 'tracks' : body?.type === 'album' ? 'album' : null;
-  if (!type) return { error: 'Type de demande invalide.' };
+  if (!type) return { error: 'badType' };
   const artist = str(body.artist, 120);
   const album = str(body.album, 160);
   const tracks = Array.isArray(body.tracks) ? body.tracks.map((t) => str(t, 160)).filter(Boolean).slice(0, 30) : [];
   const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 500) : '';
-  if (!artist) return { error: "Le nom de l'artiste est obligatoire." };
-  if (type === 'album' && !album) return { error: "Le nom de l'album est obligatoire." };
-  if (type === 'tracks' && !tracks.length) return { error: 'Indiquez au moins un titre.' };
+  if (!artist) return { error: 'needArtist' };
+  if (type === 'album' && !album) return { error: 'needAlbum' };
+  if (type === 'tracks' && !tracks.length) return { error: 'needTrack' };
   return { value: { type, artist, album: album || undefined, tracks: type === 'tracks' ? tracks : [], comment: comment || undefined } };
 }
 
@@ -157,7 +185,7 @@ app.use('/api', (req, res, next) => {
   if (origin && (CORS_ORIGINS.includes('*') || CORS_ORIGINS.includes(origin))) {
     res.set('Access-Control-Allow-Origin', CORS_ORIGINS.includes('*') ? '*' : origin);
     res.set('Vary', 'Origin');
-    res.set('Access-Control-Allow-Headers', 'Content-Type, X-Emby-Token, X-Emby-UserId');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, X-Emby-Token, X-Emby-UserId, Accept-Language');
     res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
     res.set('Access-Control-Max-Age', '86400');
   }
@@ -172,7 +200,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'soundy', emby:
 // Liste des demandes : les miennes, ou toutes (admin)
 app.get('/api/requests', auth, (req, res) => {
   const scope = req.query.scope === 'all' ? 'all' : 'mine';
-  if (scope === 'all' && !req.user.isAdmin) return res.status(403).json({ error: 'Réservé aux administrateurs.' });
+  if (scope === 'all' && !req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
   const list = scope === 'all' ? requests : requests.filter((r) => r.userId === req.user.id);
   res.json([...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
 });
@@ -180,10 +208,10 @@ app.get('/api/requests', auth, (req, res) => {
 // Nouvelle demande
 app.post('/api/requests', auth, async (req, res) => {
   const { value, error } = validateNew(req.body);
-  if (error) return res.status(400).json({ error });
+  if (error) return res.status(400).json({ error: msg(req, error) });
   const pending = requests.filter((r) => r.userId === req.user.id && r.status === 'pending').length;
   if (pending >= MAX_PENDING) {
-    return res.status(429).json({ error: `Vous avez déjà ${pending} demandes en attente. Patientez un peu 🙂` });
+    return res.status(429).json({ error: msg(req, 'tooMany', { n: pending }) });
   }
   const now = new Date().toISOString();
   const r = { id: randomUUID(), ...value, status: 'pending', userId: req.user.id, userName: req.user.name, createdAt: now, updatedAt: now };
@@ -196,11 +224,11 @@ app.post('/api/requests', auth, async (req, res) => {
 
 // Mise à jour du statut (admin)
 app.patch('/api/requests/:id', auth, async (req, res) => {
-  if (!req.user.isAdmin) return res.status(403).json({ error: 'Réservé aux administrateurs.' });
+  if (!req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
   const r = requests.find((x) => x.id === req.params.id);
-  if (!r) return res.status(404).json({ error: 'Demande introuvable.' });
+  if (!r) return res.status(404).json({ error: msg(req, 'notFound') });
   const status = req.body?.status;
-  if (!['pending', 'added', 'refused'].includes(status)) return res.status(400).json({ error: 'Statut invalide.' });
+  if (!['pending', 'added', 'refused'].includes(status)) return res.status(400).json({ error: msg(req, 'badStatus') });
   r.status = status;
   r.adminNote = typeof req.body.adminNote === 'string' && req.body.adminNote.trim() ? req.body.adminNote.trim().slice(0, 500) : undefined;
   r.updatedAt = new Date().toISOString();
@@ -211,16 +239,16 @@ app.patch('/api/requests/:id', auth, async (req, res) => {
 // Suppression : l'auteur (si en attente) ou un admin
 app.delete('/api/requests/:id', auth, async (req, res) => {
   const i = requests.findIndex((x) => x.id === req.params.id);
-  if (i < 0) return res.status(404).json({ error: 'Demande introuvable.' });
+  if (i < 0) return res.status(404).json({ error: msg(req, 'notFound') });
   const r = requests[i];
   const own = r.userId === req.user.id && r.status === 'pending';
-  if (!own && !req.user.isAdmin) return res.status(403).json({ error: 'Action non autorisée.' });
+  if (!own && !req.user.isAdmin) return res.status(403).json({ error: msg(req, 'forbidden') });
   requests.splice(i, 1);
   await saveStore();
   res.json({ ok: true });
 });
 
-app.use('/api', (_req, res) => res.status(404).json({ error: 'Route inconnue.' }));
+app.use('/api', (req, res) => res.status(404).json({ error: msg(req, 'unknownRoute') }));
 
 // ----------------------------------------------------------------------------
 // Proxy Emby optionnel : https://soundy.exemple.fr/emby/... → EMBY_URL/...

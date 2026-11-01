@@ -4,6 +4,7 @@ import { audio, usePlayer } from '../store/player';
 import { toast } from '../store/toast';
 import { IconBluetooth, IconCheck, IconSettings, IconSpeaker } from './Icons';
 import { MenuItem, Sheet } from './Sheet';
+import { useT } from '../i18n';
 
 type MediaDevicesExt = MediaDevices & { selectAudioOutput?: (o?: { deviceId?: string }) => Promise<MediaDeviceInfo> };
 
@@ -39,6 +40,7 @@ export function useOutputLabel(open: boolean) {
 
 export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const setSink = usePlayer((s) => s.setSink);
+  const { t } = useT();
   const current = useOutputLabel(open);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [nativeOutputs, setNativeOutputs] = useState<AudioOutput[]>([]);
@@ -59,12 +61,12 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
   const pick = async () => {
     try {
       const device = await md()!.selectAudioOutput!();
-      await setSink(device.deviceId, device.label || 'Appareil externe');
-      toast(`Lecture sur ${device.label || "l'appareil choisi"}`, 'success');
+      await setSink(device.deviceId, device.label || t('output.external'));
+      toast(t('output.playingOnToast', { device: device.label || t('output.chosenDevice') }), 'success');
       onClose();
     } catch (e) {
       if ((e as DOMException).name !== 'NotAllowedError' && (e as DOMException).name !== 'AbortError') {
-        toast("Impossible d'utiliser cet appareil", 'error');
+        toast(t('output.cannotUse'), 'error');
       }
     }
   };
@@ -75,17 +77,17 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
       stream.getTracks().forEach((t) => t.stop());
       await listDevices();
     } catch {
-      toast("Autorisation refusée : impossible d'afficher le nom des appareils", 'error');
+      toast(t('output.denied'), 'error');
     }
   };
 
   const choose = async (d: MediaDeviceInfo | null) => {
     try {
-      await setSink(d?.deviceId ?? '', d ? d.label || 'Appareil externe' : null);
-      toast(d ? `Lecture sur ${d.label || "l'appareil choisi"}` : 'Sortie par défaut', 'success');
+      await setSink(d?.deviceId ?? '', d ? d.label || t('output.external') : null);
+      toast(d ? t('output.playingOnToast', { device: d.label || t('output.chosenDevice') }) : t('output.defaultToast'), 'success');
       onClose();
     } catch {
-      toast("Impossible d'utiliser cet appareil", 'error');
+      toast(t('output.cannotUse'), 'error');
     }
   };
 
@@ -95,14 +97,23 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
     <Sheet
       open={open}
       onClose={onClose}
-      title="Sortie audio"
+      title={t('output.title')}
       description={
         current.label ? (
           <>
-            Lecture en cours sur <strong>{current.label}</strong>.
+            {(() => {
+              const [before, after] = t('output.playingOn', { device: '\u0000' }).split('\u0000');
+              return (
+                <>
+                  {before}
+                  <strong>{current.label}</strong>
+                  {after}
+                </>
+              );
+            })()}
           </>
         ) : (
-          'Lecture sur la sortie par défaut de votre appareil.'
+          t('output.default')
         )
       }
     >
@@ -114,14 +125,14 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
               key={o.name + o.type}
               icon={o.type === 'bluetooth' ? <IconBluetooth /> : <IconSpeaker />}
               label={o.name}
-              hint={o.type === 'bluetooth' ? 'Bluetooth — connecté' : 'Connecté'}
+              hint={o.type === 'bluetooth' ? t('output.btConnected') : t('output.connected')}
               onClick={onClose}
             />
           ))}
           <MenuItem
             icon={<IconSettings />}
-            label="Connecter un appareil Bluetooth"
-            hint="Ouvre les réglages Bluetooth d'Android"
+            label={t('output.connectBt')}
+            hint={t('output.connectBtHint')}
             onClick={() => void openBluetoothSettings()}
           />
         </>
@@ -131,8 +142,8 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
       {!isNative() && canPick() && (
         <MenuItem
           icon={<IconBluetooth />}
-          label="Choisir un appareil…"
-          hint="Casque, enceinte Bluetooth, sortie USB…"
+          label={t('output.choose')}
+          hint={t('output.chooseHint')}
           onClick={() => void pick()}
         />
       )}
@@ -141,32 +152,31 @@ export function OutputSheet({ open, onClose }: { open: boolean; onClose: () => v
         <>
           <MenuItem
             icon={!activeSink ? <IconCheck /> : <IconSpeaker />}
-            label="Sortie par défaut du système"
+            label={t('output.systemDefault')}
             onClick={() => void choose(null)}
           />
           {devices.map((d) => (
             <MenuItem
               key={d.deviceId}
               icon={activeSink === d.deviceId ? <IconCheck /> : /bluetooth|bt|airpods|buds|jbl|bose|sony/i.test(d.label) ? <IconBluetooth /> : <IconSpeaker />}
-              label={d.label || 'Appareil audio'}
+              label={d.label || t('output.audioDevice')}
               onClick={() => void choose(d)}
             />
           ))}
           {labelsHidden && (
-            <MenuItem icon={<IconSettings />} label="Afficher le nom des appareils" hint="Nécessite une autorisation du navigateur" onClick={() => void unlockLabels()} />
+            <MenuItem icon={<IconSettings />} label={t('output.showNames')} hint={t('output.showNamesHint')} onClick={() => void unlockLabels()} />
           )}
         </>
       )}
 
       {!isNative() && canPick() && activeSink && (
-        <MenuItem icon={<IconSpeaker />} label="Revenir à la sortie par défaut" onClick={() => void choose(null)} />
+        <MenuItem icon={<IconSpeaker />} label={t('output.backToDefault')} onClick={() => void choose(null)} />
       )}
 
       <div className="banner" style={{ marginTop: 16, marginBottom: 0 }}>
         <IconBluetooth style={{ color: 'var(--accent)' }} />
         <span>
-          Une fois votre casque ou votre enceinte Bluetooth connecté(e) au téléphone, Soundy l'utilise automatiquement. Ses
-          boutons (lecture, pause, suivant, précédent) pilotent aussi Soundy.
+          {t('output.help')}
         </span>
       </div>
     </Sheet>

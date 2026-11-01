@@ -51,6 +51,13 @@ public class PlaybackService extends Service {
     static volatile Listener listener;
     static volatile PlaybackService instance;
     static volatile State pendingState;
+    /** Langue choisie dans l'application ("fr" ou "en"). */
+    static volatile String lang = "fr";
+    private String channelLang = null;
+
+    private static String tr(String fr, String en) {
+        return "en".equals(lang) ? en : fr;
+    }
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private MediaSessionCompat session;
@@ -113,6 +120,7 @@ public class PlaybackService extends Service {
                     s.positionMs, s.playing ? 1f : 0f)
                 .build());
 
+            if (!lang.equals(channelLang)) createChannel(); // renomme le canal si la langue a changé
             Notification n = buildNotification(s);
             if (Build.VERSION.SDK_INT >= 29) {
                 startForeground(NOTIFICATION_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
@@ -137,11 +145,11 @@ public class PlaybackService extends Service {
             .setShowWhen(false)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
-            .addAction(android.R.drawable.ic_media_previous, "Précédent", mediaIntent("previoustrack", 1))
+            .addAction(android.R.drawable.ic_media_previous, tr("Précédent", "Previous"), mediaIntent("previoustrack", 1))
             .addAction(s.playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
-                s.playing ? "Pause" : "Lecture", mediaIntent(s.playing ? "pause" : "play", 2))
-            .addAction(android.R.drawable.ic_media_next, "Suivant", mediaIntent("nexttrack", 3))
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Fermer", mediaIntent("close", 4))
+                s.playing ? tr("Pause", "Pause") : tr("Lecture", "Play"), mediaIntent(s.playing ? "pause" : "play", 2))
+            .addAction(android.R.drawable.ic_media_next, tr("Suivant", "Next"), mediaIntent("nexttrack", 3))
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, tr("Fermer", "Close"), mediaIntent("close", 4))
             .setDeleteIntent(mediaIntent("close", 5))
             .setStyle(new androidx.media.app.NotificationCompat.MediaStyle()
                 .setMediaSession(session.getSessionToken())
@@ -156,8 +164,9 @@ public class PlaybackService extends Service {
 
     private void createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
-            NotificationChannel ch = new NotificationChannel(CHANNEL_ID, "Lecture en cours", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Contrôles de lecture de Soundy");
+            channelLang = lang;
+            NotificationChannel ch = new NotificationChannel(CHANNEL_ID, tr("Lecture en cours", "Now playing"), NotificationManager.IMPORTANCE_LOW);
+            ch.setDescription(tr("Contrôles de lecture de Soundy", "Soundy playback controls"));
             ch.setShowBadge(false);
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.createNotificationChannel(ch);

@@ -7,7 +7,8 @@ import { IconAlert, IconBack, IconDownload, IconDownloaded, IconMore, IconPlay, 
 import { ProgressRing } from '../components/ProgressRing';
 import { MenuItem, Sheet } from '../components/Sheet';
 import { TrackWheel } from '../components/TrackWheel';
-import { formatDuration, plural } from '../lib/format';
+import { useT } from '../i18n';
+import { formatDuration } from '../lib/format';
 import { useAuth } from '../store/auth';
 import { useDownloadState, useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
@@ -18,6 +19,7 @@ export default function AlbumPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const client = useAuth((s) => s.client);
+  const { t, tn } = useT();
   const online = useNetwork((s) => s.online);
   const downloaded = useDownloads((s) => s.downloaded);
   const playQueue = usePlayer((s) => s.playQueue);
@@ -90,10 +92,10 @@ export default function AlbumPage() {
   if (error && !localTracks.length) {
     return (
       <div className="page">
-        <button className="icon-btn" onClick={back} aria-label="Retour">
+        <button className="icon-btn" onClick={back} aria-label={t('common.back')}>
           <IconBack />
         </button>
-        <Empty icon={<IconAlert />} title="Album introuvable" text={error} />
+        <Empty icon={<IconAlert />} title={t('album.notFound')} text={error} />
       </div>
     );
   }
@@ -101,13 +103,13 @@ export default function AlbumPage() {
   return (
     <div className="page page-fill">
       <header className="page-header" style={{ marginBottom: 16 }}>
-        <button className="icon-btn" onClick={back} aria-label="Retour">
+        <button className="icon-btn" onClick={back} aria-label={t('common.back')}>
           <IconBack />
         </button>
         <span className="muted" style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.16em' }}>
-          ALBUM
+          {t('album.label')}
         </span>
-        <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Options" disabled={!list.length}>
+        <button className="icon-btn" onClick={() => setMenu(true)} aria-label={t('player.options')} disabled={!list.length}>
           <IconMore />
         </button>
       </header>
@@ -129,7 +131,7 @@ export default function AlbumPage() {
           </p>
           {list.length > 0 && (
             <p style={{ marginTop: 4, fontSize: 12.5, color: 'var(--text-3)', fontWeight: 600 }}>
-              {[info?.year, plural(list.length, 'titre'), formatDuration(totalDuration)].filter(Boolean).join(' · ')}
+              {[info?.year, tn('common.tracks', list.length), formatDuration(totalDuration)].filter(Boolean).join(' · ')}
             </p>
           )}
         </div>
@@ -137,17 +139,17 @@ export default function AlbumPage() {
 
       <div className="row" style={{ gap: 14, margin: '14px 0 4px' }}>
         <button className="btn accent sm" onClick={() => playQueue(list, 0, { shuffle: false })} disabled={!list.length} style={{ height: 46, flex: 1 }}>
-          <IconPlay /> Lire l'album
+          <IconPlay /> {t('album.play')}
         </button>
-        <button className="icon-btn" onClick={() => playQueue(list, 0, { shuffle: true })} disabled={!list.length} aria-label="Lecture aléatoire">
+        <button className="icon-btn" onClick={() => playQueue(list, 0, { shuffle: true })} disabled={!list.length} aria-label={t('library.shuffle')}>
           <IconShuffle />
         </button>
         <button
           className={`icon-btn ${fullyDownloaded ? 'active' : ''}`}
           onClick={toggleDownload}
           disabled={!list.length || (!online && !fullyDownloaded)}
-          aria-label={fullyDownloaded ? 'Album téléchargé' : dl.pending ? 'Annuler le téléchargement' : "Télécharger l'album"}
-          title={dl.done > 0 && dl.done < dl.total && !dl.pending ? `${dl.done} / ${dl.total} titres téléchargés` : undefined}
+          aria-label={fullyDownloaded ? t('album.downloaded') : dl.pending ? t('album.cancelDownload') : t('album.download')}
+          title={dl.done > 0 && dl.done < dl.total && !dl.pending ? t('album.partial', { done: dl.done, total: dl.total }) : undefined}
         >
           {dl.pending ? (
             <ProgressRing value={dl.progress} />
@@ -161,7 +163,7 @@ export default function AlbumPage() {
 
       {list.length > 0 ? (
         <div className="wheel-area">
-          <TrackWheel tracks={list} mode="album" multiDisc={multiDisc} label="Titres de l'album" onPlay={(i) => playQueue(list, i, { shuffle: false })} />
+          <TrackWheel tracks={list} mode="album" multiDisc={multiDisc} label={t('album.trackList')} onPlay={(i) => playQueue(list, i, { shuffle: false })} />
         </div>
       ) : (
         loading && (
@@ -176,7 +178,7 @@ export default function AlbumPage() {
       <Sheet open={menu} onClose={() => setMenu(false)} title={info?.title} description={info?.artist}>
         <MenuItem
           icon={<IconPlayNext />}
-          label="Lire ensuite"
+          label={t('album.playNext')}
           onClick={() => {
             usePlayer.getState().addNext(list);
             setMenu(false);
@@ -184,7 +186,7 @@ export default function AlbumPage() {
         />
         <MenuItem
           icon={<IconQueue />}
-          label="Ajouter à la file d'attente"
+          label={t('album.addToQueue')}
           onClick={() => {
             usePlayer.getState().addToQueue(list);
             setMenu(false);
@@ -193,7 +195,7 @@ export default function AlbumPage() {
         {dl.pending > 0 ? (
           <MenuItem
             icon={<IconX />}
-            label="Annuler les téléchargements"
+            label={t('album.cancelDownloads')}
             onClick={() => {
               list.forEach((t) => cancel(t.id));
               setMenu(false);
@@ -203,8 +205,8 @@ export default function AlbumPage() {
           !fullyDownloaded && (
             <MenuItem
               icon={<IconDownload />}
-              label="Télécharger l'album"
-              hint="Lecture hors ligne, prioritaire sur le streaming"
+              label={t('album.download')}
+              hint={t('album.downloadHint')}
               disabled={!online}
               onClick={() => {
                 download(list);
@@ -216,8 +218,8 @@ export default function AlbumPage() {
         {dl.done > 0 && (
           <MenuItem
             icon={<IconTrash />}
-            label="Supprimer de l'appareil"
-            hint={`${dl.done} titre${dl.done > 1 ? 's' : ''} téléchargé${dl.done > 1 ? 's' : ''}`}
+            label={t('album.removeFromDevice')}
+            hint={tn('album.downloadedCount', dl.done)}
             danger
             onClick={() => {
               void remove(ids.filter((x) => downloaded[x]));

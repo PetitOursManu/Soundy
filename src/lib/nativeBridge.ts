@@ -1,6 +1,7 @@
 // Synchronise le lecteur avec le service Android (notification, écran de
 // verrouillage, boutons Bluetooth) quand l'application tourne sous Android.
 import { audio, usePlayer } from '../store/player';
+import { useSettings } from '../store/settings';
 import { isNative, onNativeMediaAction, updateNativePlayback } from './native';
 
 export function initNativeBridge() {
@@ -26,6 +27,14 @@ export function initNativeBridge() {
       position: audio.currentTime,
       duration: s.duration || t.duration,
     });
+  });
+
+  // Changement de langue : la notification Android est réécrite dans la nouvelle langue
+  useSettings.subscribe((st, prev) => {
+    if (st.language === prev.language) return;
+    const s = usePlayer.getState();
+    const t = s.queue[s.index];
+    if (t) updateNativePlayback({ title: t.title, artist: t.artist, album: t.album, playing: s.isPlaying, position: audio.currentTime, duration: s.duration });
   });
 
   // Après un déplacement dans le titre, on recale la position affichée par Android

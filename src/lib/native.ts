@@ -1,6 +1,7 @@
 // Pont vers le code natif Android (plugin « SoundyAudio », voir
 // android/app/src/main/java/fr/soundy/app/SoundyAudioPlugin.java).
 import { Capacitor, registerPlugin } from '@capacitor/core';
+import { currentLang, t } from '../i18n';
 
 export interface AudioOutput {
   name: string;
@@ -15,6 +16,7 @@ export interface PlaybackInfo {
   position?: number; // secondes
   duration?: number; // secondes
   stop?: boolean;
+  lang?: string;
 }
 
 interface SoundyAudioPlugin {
@@ -32,7 +34,9 @@ export const isNative = () => Capacitor.isNativePlatform();
 export async function getNativeOutputs(): Promise<AudioOutput[]> {
   if (!isNative()) return [];
   try {
-    return (await SoundyAudio.getOutputs()).outputs;
+    // Nom vide (haut-parleur, appareil sans nom) → nom traduit selon la langue
+    const keys = { bluetooth: 'output.bluetooth', wired: 'output.wired', usb: 'output.usb', speaker: 'output.speaker', other: 'output.audioDevice' } as const;
+    return (await SoundyAudio.getOutputs()).outputs.map((o) => ({ ...o, name: o.name || t(keys[o.type] ?? 'output.audioDevice') }));
   } catch {
     return [];
   }
@@ -43,7 +47,7 @@ export async function openBluetoothSettings() {
 }
 
 export function updateNativePlayback(info: PlaybackInfo) {
-  if (isNative()) SoundyAudio.updatePlayback(info).catch(() => {});
+  if (isNative()) SoundyAudio.updatePlayback({ ...info, lang: currentLang() }).catch(() => {});
 }
 
 export function onNativeMediaAction(cb: (action: string) => void) {

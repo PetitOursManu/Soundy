@@ -21,6 +21,7 @@ import { Cover } from './Cover';
 import { IconDownloaded, IconMore, IconPause } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { TrackMenu } from './TrackRow';
+import { useT } from '../i18n';
 
 interface Props {
   tracks: Track[];
@@ -64,7 +65,8 @@ interface ItemNodes {
   actions: HTMLElement | null;
 }
 
-export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey, label = 'Liste des titres', multiDisc }: Props) {
+export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey, label, multiDisc }: Props) {
+  const { t } = useT();
   const max = Math.max(0, tracks.length - 1);
   const currentId = usePlayer((s) => s.queue[s.index]?.id);
 
@@ -413,7 +415,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
         className="wheel"
         role="listbox"
         tabIndex={0}
-        aria-label={`${label} — molette, flèches ou glisser pour naviguer`}
+        aria-label={t('wheel.help', { label: label ?? t('wheel.list') })}
         aria-activedescendant={tracks[focus] ? `wheel-${tracks[focus].id}` : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -440,7 +442,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
               index={i}
               track={tracks[i]}
               cover={geo.cover}
-              subtitle={mode === 'album' ? `Piste ${trackNumber(tracks[i], i)} · ${formatTime(tracks[i].duration)}` : tracks[i].artist}
+              subtitle={mode === 'album' ? t('album.track', { n: trackNumber(tracks[i], i), duration: formatTime(tracks[i].duration) }) : tracks[i].artist}
               focused={i === focus}
               depth={Math.abs(i - focus)}
               register={register}
@@ -487,6 +489,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
   const isCurrent = usePlayer((s) => s.queue[s.index]?.id === track.id);
   const isPlaying = usePlayer((s) => isCurrent && s.isPlaying);
   const toggle = usePlayer((s) => s.toggle);
+  const { t } = useT();
   const downloaded = useDownloads((s) => !!s.downloaded[track.id]);
   const progress = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id)?.progress);
   const online = useNetwork((s) => s.online);
@@ -512,14 +515,14 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
       <span className="wheel-text">
         <span className="wt ellipsis">{track.title}</span>
         <span className="ws">
-          {progress !== undefined ? <ProgressRing value={progress} size={13} /> : downloaded && <IconDownloaded aria-label="Téléchargé" />}
+          {progress !== undefined ? <ProgressRing value={progress} size={13} /> : downloaded && <IconDownloaded aria-label={t('common.downloaded')} />}
           <span className="ellipsis">{subtitle}</span>
         </span>
       </span>
       <span className="wheel-actions">
         <button
           className="icon-btn sm flat wheel-more"
-          aria-label="Plus d'options"
+          aria-label={t('common.more')}
           tabIndex={focused ? 0 : -1}
           onClick={(e) => {
             e.stopPropagation();
@@ -530,7 +533,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
         </button>
         <button
           className={`play-pill ${isCurrent ? 'on' : ''}`}
-          aria-label={isPlaying ? 'Pause' : 'Lire'}
+          aria-label={isPlaying ? t('common.pause') : t('common.play')}
           tabIndex={focused ? 0 : -1}
           disabled={unavailable}
           onClick={(e) => {
@@ -542,10 +545,10 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
         >
           {isPlaying ? (
             <>
-              <IconPause /> <span className="lbl">Pause</span>
+              <IconPause /> <span className="lbl">{t('common.pause')}</span>
             </>
           ) : (
-            <span className="lbl">Lire</span>
+            <span className="lbl">{t('common.play')}</span>
           )}
         </button>
       </span>

@@ -7,6 +7,7 @@ import { Empty } from '../components/Empty';
 import { IconAlert, IconCheck, IconCloudOff, IconDisc, IconDownload, IconList, IconSettings, IconShuffle, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { TrackWheel } from '../components/TrackWheel';
+import { Key, useT } from '../i18n';
 import { artistTokens, mergeAlbums, normName } from '../lib/albums';
 import { usePaged, useScrollRestore, useSentinel } from '../lib/hooks';
 import { useAuth } from '../store/auth';
@@ -18,17 +19,17 @@ import type { DownloadedTrack } from '../lib/db';
 
 type View = 'albums' | 'tracks';
 
-const ALBUM_SORTS: { value: SortKey; label: string }[] = [
-  { value: 'artist', label: 'Artiste' },
-  { value: 'name', label: 'A → Z' },
-  { value: 'recent', label: 'Ajouts récents' },
-  { value: 'year', label: 'Année' },
+const ALBUM_SORTS: { value: SortKey; label: Key }[] = [
+  { value: 'artist', label: 'library.sort.artist' },
+  { value: 'name', label: 'library.sort.name' },
+  { value: 'recent', label: 'library.sort.recent' },
+  { value: 'year', label: 'library.sort.year' },
 ];
 
-const TRACK_SORTS: { value: SortKey; label: string }[] = [
-  { value: 'name', label: 'A → Z' },
-  { value: 'artist', label: 'Artiste' },
-  { value: 'recent', label: 'Ajouts récents' },
+const TRACK_SORTS: { value: SortKey; label: Key }[] = [
+  { value: 'name', label: 'library.sort.name' },
+  { value: 'artist', label: 'library.sort.artist' },
+  { value: 'recent', label: 'library.sort.recent' },
 ];
 
 /** Regroupe les titres téléchargés par album (mode hors ligne). */
@@ -64,6 +65,7 @@ export default function Library() {
   const defaultSort = (v: View): SortKey => (v === 'albums' ? 'artist' : 'name');
   const [sort, setSort] = useState<SortKey>(() => (sessionStorage.getItem(`sort2:${view}`) as SortKey) || defaultSort(view));
   const client = useAuth((s) => s.client);
+  const { t, tn, locale } = useT();
   const online = useNetwork((s) => s.online);
   const downloaded = useDownloads((s) => s.downloaded);
   const playQueue = usePlayer((s) => s.playQueue);
@@ -139,7 +141,7 @@ export default function Library() {
       const all: Track[] = [];
       for (const a of list) all.push(...(await client.getTracksOfAlbums(a.ids ?? [a.id])));
       useDownloads.getState().download(all);
-      toast(`${list.length} album${list.length > 1 ? 's' : ''} · ${all.length} titres ajoutés aux téléchargements`, 'success');
+      toast(t('library.selectionQueued', { albums: tn('common.albums', list.length), tracks: tn('common.tracks', all.length) }), 'success');
       stopSelect();
     } catch (e) {
       toast((e as Error).message, 'error');
@@ -155,7 +157,7 @@ export default function Library() {
     try {
       if (!online) {
         const local = Object.values(downloaded);
-        if (!local.length) return toast('Aucun titre téléchargé', 'info');
+        if (!local.length) return toast(t('library.noDownloads'), 'info');
         return playQueue(local, 0, { shuffle: true });
       }
       const random = await client!.getRandomTracks(200);
@@ -171,13 +173,13 @@ export default function Library() {
       <header className="page-header">
         <h1 style={{ margin: 0 }}>
           <Brand size={46} />
-          <span className="sr-only">Bibliothèque</span>
+          <span className="sr-only">{t('library.title')}</span>
         </h1>
         <div className="row" style={{ gap: 14 }}>
-          <button className="icon-btn" onClick={shuffleAll} aria-label="Lecture aléatoire">
+          <button className="icon-btn" onClick={shuffleAll} aria-label={t('library.shuffle')}>
             <IconShuffle />
           </button>
-          <Link to="/settings" className="icon-btn" aria-label="Réglages">
+          <Link to="/settings" className="icon-btn" aria-label={t('library.settings')}>
             <IconSettings />
           </Link>
         </div>
@@ -186,17 +188,17 @@ export default function Library() {
       {!online && (
         <div className="banner">
           <IconCloudOff />
-          <span>Vous êtes hors ligne : seuls les titres téléchargés sur cet appareil sont disponibles.</span>
+          <span>{t('library.offlineBanner')}</span>
         </div>
       )}
 
       <Segmented<View>
-        label="Affichage"
+        label={t('library.view')}
         value={view}
         onChange={setView}
         options={[
-          { value: 'albums', label: 'Albums', icon: <IconDisc /> },
-          { value: 'tracks', label: 'Titres', icon: <IconList /> },
+          { value: 'albums', label: t('library.albums'), icon: <IconDisc /> },
+          { value: 'tracks', label: t('library.tracks'), icon: <IconList /> },
         ]}
       />
 
@@ -204,18 +206,18 @@ export default function Library() {
         <div className="chips" style={{ marginTop: 18 }}>
           {(view === 'albums' ? ALBUM_SORTS : TRACK_SORTS).map((s) => (
             <button key={s.value} className={`chip ${sort === s.value ? 'on' : ''}`} onClick={() => changeSort(s.value)}>
-              {s.label}
+              {t(s.label)}
             </button>
           ))}
           {list.total > 0 && (
             <span className="muted" style={{ alignSelf: 'center', fontSize: 12.5, whiteSpace: 'nowrap', paddingLeft: 4 }}>
-              {(view === 'albums' ? Math.max(mergedAlbums.length, list.total - (albums.items.length - mergedAlbums.length)) : list.total).toLocaleString('fr-FR')}{' '}
-              {view === 'albums' ? 'albums' : 'titres'}
+              {(view === 'albums' ? Math.max(mergedAlbums.length, list.total - (albums.items.length - mergedAlbums.length)) : list.total).toLocaleString(locale)}{' '}
+              {view === 'albums' ? t('library.albums').toLowerCase() : t('library.tracks').toLowerCase()}
             </span>
           )}
           {view === 'albums' && (
             <button className={`chip ${selecting ? 'on' : ''}`} onClick={() => (selecting ? stopSelect() : startSelect())} style={{ marginLeft: 'auto' }}>
-              {selecting ? 'Annuler' : 'Sélectionner'}
+              {selecting ? t('common.cancel') : t('library.select')}
             </button>
           )}
         </div>
@@ -260,26 +262,26 @@ export default function Library() {
         )}
 
         {list.error && (
-          <Empty icon={<IconAlert />} title="Impossible de charger la bibliothèque" text={list.error}>
+          <Empty icon={<IconAlert />} title={t('library.loadError')} text={list.error}>
             <button className="btn" onClick={() => list.reload()}>
-              Réessayer
+              {t('common.retry')}
             </button>
           </Empty>
         )}
         {online && list.done && !list.items.length && !list.error && (
-          <Empty icon={<IconDisc />} title="Bibliothèque vide" text="Aucune musique n'a été trouvée sur le serveur Emby." />
+          <Empty icon={<IconDisc />} title={t('library.empty')} text={t('library.emptyText')} />
         )}
         {view === 'albums' && <div ref={sentinel} className="sentinel" />}
       </div>
 
       {selecting && (
-        <div className="select-bar" role="toolbar" aria-label="Sélection d'albums">
-          <button className="icon-btn flat" onClick={stopSelect} aria-label="Quitter la sélection">
+        <div className="select-bar" role="toolbar" aria-label={t('library.selection')}>
+          <button className="icon-btn flat" onClick={stopSelect} aria-label={t('library.quitSelection')}>
             <IconX />
           </button>
           <div className="meta">
             <strong>
-              {selected.size} album{selected.size > 1 ? 's' : ''}
+              {tn('common.albums', selected.size)}
             </strong>
             <button
               className="link"
@@ -287,12 +289,12 @@ export default function Library() {
                 setSelected(selected.size === mergedAlbums.length ? new Map() : new Map(mergedAlbums.map((a) => [keyOf(a), a])))
               }
             >
-              <IconCheck /> {selected.size === mergedAlbums.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+              <IconCheck /> {selected.size === mergedAlbums.length ? t('library.unselectAll') : t('library.selectAll')}
             </button>
           </div>
           <button className="btn accent sm" disabled={!selected.size || busy} onClick={() => void downloadSelected()}>
             {busy ? <span className="loader" style={{ width: 16, height: 16 }} /> : <IconDownload />}
-            Télécharger
+            {t('library.download')}
           </button>
         </div>
       )}
@@ -301,6 +303,7 @@ export default function Library() {
 }
 
 function OfflineLibrary({ view }: { view: View }) {
+  const { t } = useT();
   const downloaded = useDownloads((s) => s.downloaded);
   const playQueue = usePlayer((s) => s.playQueue);
   const all = useMemo(() => Object.values(downloaded).sort((a, b) => a.title.localeCompare(b.title, 'fr')), [downloaded]);
@@ -310,8 +313,8 @@ function OfflineLibrary({ view }: { view: View }) {
     return (
       <Empty
         icon={<IconCloudOff />}
-        title="Rien à écouter hors ligne"
-        text="Téléchargez des albums ou des titres lorsque vous êtes connecté pour les écouter sans réseau."
+        title={t('library.offlineEmpty')}
+        text={t('library.offlineEmptyText')}
       />
     );
   }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Album } from '../api/emby';
 import { albumPath } from '../lib/albums';
 import { hapticClick, hapticHeavy } from '../lib/haptics';
+import { useT } from '../i18n';
 import { Cover } from './Cover';
 import { IconCheck, IconDownloaded } from './Icons';
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting, selected, onToggle, onLongPress }: Props) {
+  const { t } = useT();
   const timer = useRef<number>();
   const longPressed = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -71,7 +73,7 @@ export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting,
         </span>
       ) : (
         downloaded && (
-          <span className="dl-badge" title="Téléchargé">
+          <span className="dl-badge" title={t('common.downloaded')}>
             <IconDownloaded />
           </span>
         )

@@ -7,6 +7,7 @@ import { useDownloads } from './downloads';
 import { useNetwork } from './network';
 import { useSettings } from './settings';
 import { toast } from './toast';
+import { t } from '../i18n';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -87,7 +88,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
     if (!url) {
       const client = getClient();
       if (!client || !useNetwork.getState().online) {
-        toast(`« ${track.title} » n'est pas disponible hors ligne`, 'error');
+        toast(t('player.notOffline', { title: track.title }), 'error');
         set({ buffering: false, isPlaying: false });
         skipToPlayable();
         return;
@@ -260,14 +261,14 @@ export const usePlayer = create<PlayerState>((set, get) => {
       const q = queue.slice();
       q.splice(index + 1, 0, ...tracks);
       set({ queue: q });
-      toast(tracks.length > 1 ? `${tracks.length} titres lus ensuite` : `« ${tracks[0].title} » sera lu ensuite`, 'success');
+      toast(tracks.length > 1 ? t('player.playNextMany', { n: tracks.length }) : t('player.playNextOne', { title: tracks[0].title }), 'success');
     },
 
     addToQueue: (tracks) => {
       const { queue } = get();
       if (!queue.length) return get().playQueue(tracks);
       set({ queue: [...queue, ...tracks] });
-      toast(tracks.length > 1 ? `${tracks.length} titres ajoutés à la file` : `« ${tracks[0].title} » ajouté à la file`, 'success');
+      toast(tracks.length > 1 ? t('player.queuedMany', { n: tracks.length }) : t('player.queuedOne', { title: tracks[0].title }), 'success');
     },
 
     removeAt: (i) => {
@@ -280,7 +281,7 @@ export const usePlayer = create<PlayerState>((set, get) => {
 
     setSink: async (deviceId, label) => {
       const el = audio as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
-      if (!el.setSinkId) throw new Error('Non pris en charge');
+      if (!el.setSinkId) throw new Error(t('player.unsupported'));
       await el.setSinkId(deviceId);
       set({ sinkLabel: label });
     },
@@ -328,9 +329,9 @@ audio.addEventListener('ended', () => {
 });
 audio.addEventListener('error', () => {
   if (!audio.getAttribute('src')) return;
-  const t = st().current();
+  const cur = st().current();
   usePlayer.setState({ buffering: false, isPlaying: false });
-  toast(t ? `Lecture impossible : « ${t.title} »` : 'Lecture impossible', 'error');
+  toast(cur ? t('player.cannotPlay', { title: cur.title }) : t('player.cannotPlayShort'), 'error');
 });
 
 // Contrôles système : écran de verrouillage, casque / enceinte Bluetooth, voiture…
@@ -364,6 +365,6 @@ navigator.mediaDevices?.addEventListener?.('devicechange', async () => {
   if (!still) {
     audio.pause();
     usePlayer.setState({ sinkLabel: null });
-    toast(`${label} déconnecté — lecture en pause`);
+    toast(t('player.disconnected', { device: label }));
   }
 });

@@ -56,9 +56,10 @@ public class SoundyAudioPlugin extends Plugin {
             for (AudioDeviceInfo d : am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
                 String type = typeOf(d.getType());
                 if (type == null) continue;
+                // Nom vide = l'application affiche un nom traduit selon la langue choisie
                 CharSequence productName = d.getProductName();
-                String name = productName != null && productName.length() > 0 ? productName.toString() : defaultName(type);
-                if (type.equals("speaker")) name = "Haut-parleur du téléphone";
+                String name = productName != null && productName.length() > 0 ? productName.toString() : "";
+                if (type.equals("speaker")) name = "";
                 if (!seen.add(type + ":" + name)) continue;
                 JSObject o = new JSObject();
                 o.put("name", name);
@@ -91,6 +92,8 @@ public class SoundyAudioPlugin extends Plugin {
             call.resolve();
             return;
         }
+        String lang = call.getString("lang", null);
+        if (lang != null) PlaybackService.lang = lang;
         PlaybackService.State state = new PlaybackService.State(
             call.getString("title", ""),
             call.getString("artist", ""),
@@ -167,12 +170,4 @@ public class SoundyAudioPlugin extends Plugin {
         }
     }
 
-    private static String defaultName(String type) {
-        switch (type) {
-            case "bluetooth": return "Appareil Bluetooth";
-            case "wired": return "Casque filaire";
-            case "usb": return "Appareil USB";
-            default: return "Sortie audio";
-        }
-    }
 }

@@ -5,7 +5,8 @@ import { Brand } from '../components/Brand';
 import { IconBack, IconLogout, IconServer } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
-import { formatBytes, plural } from '../lib/format';
+import { Key, useT } from '../i18n';
+import { formatBytes } from '../lib/format';
 import { clearPagedCache } from '../lib/hooks';
 import { isNative } from '../lib/native';
 import { useAuth } from '../store/auth';
@@ -19,6 +20,7 @@ export default function Settings() {
   const session = useAuth((s) => s.session)!;
   const logout = useAuth((s) => s.logout);
   const settings = useSettings();
+  const { t, tn, lang } = useT();
   const [requestsUrl, setRequestsUrl] = useState(settings.requestsUrl);
   const [testing, setTesting] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -43,9 +45,9 @@ export default function Settings() {
       const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error();
       settings.update({ requestsUrl: base });
-      toast('Serveur de demandes joignable ✓', 'success');
+      toast(t('settings.reachable'), 'success');
     } catch {
-      toast('Serveur de demandes injoignable', 'error');
+      toast(t('settings.unreachable'), 'error');
     } finally {
       setTesting(false);
     }
@@ -54,10 +56,10 @@ export default function Settings() {
   return (
     <div className="page">
       <header className="page-header">
-        <button className="icon-btn" onClick={() => navigate(-1)} aria-label="Retour">
+        <button className="icon-btn" onClick={() => navigate(-1)} aria-label={t('common.back')}>
           <IconBack />
         </button>
-        <h1 style={{ fontSize: 20, fontWeight: 800 }}>Réglages</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 800 }}>{t('settings.title')}</h1>
         <span style={{ width: 46 }} />
       </header>
 
@@ -79,19 +81,30 @@ export default function Settings() {
         {session.isAdmin && <span className="badge added">Admin</span>}
       </div>
 
-      <div className="section-title">Apparence</div>
-      <Segmented<Theme>
-        label="Thème"
-        value={settings.theme}
-        onChange={(theme) => settings.update({ theme })}
+      <div className="section-title">{t('settings.language')}</div>
+      <Segmented<'fr' | 'en'>
+        label={t('settings.language')}
+        value={lang}
+        onChange={(language) => settings.update({ language })}
         options={[
-          { value: 'auto', label: 'Auto' },
-          { value: 'light', label: 'Clair' },
-          { value: 'dark', label: 'Sombre' },
+          { value: 'fr', label: '🇫🇷 Français' },
+          { value: 'en', label: '🇬🇧 English' },
         ]}
       />
 
-      <div className="section-title">Vibrations</div>
+      <div className="section-title">{t('settings.appearance')}</div>
+      <Segmented<Theme>
+        label={t('settings.theme')}
+        value={settings.theme}
+        onChange={(theme) => settings.update({ theme })}
+        options={[
+          { value: 'auto', label: t('settings.themeAuto') },
+          { value: 'light', label: t('settings.themeLight') },
+          { value: 'dark', label: t('settings.themeDark') },
+        ]}
+      />
+
+      <div className="section-title">{t('settings.vibrations')}</div>
       <button
         className="card row"
         style={{ width: '100%', justifyContent: 'space-between', textAlign: 'left' }}
@@ -99,18 +112,18 @@ export default function Settings() {
         aria-pressed={settings.haptics}
       >
         <span>
-          <strong style={{ fontSize: 15 }}>Petites vibrations</strong>
+          <strong style={{ fontSize: 15 }}>{t('settings.vibrationsTitle')}</strong>
           <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 3 }}>
-            En défilant les titres et sur les boutons de lecture
+            {t('settings.vibrationsHint')}
           </span>
         </span>
         <span className={`switch ${settings.haptics ? 'on' : ''}`} />
       </button>
 
-      <div className="section-title">Lecture</div>
+      <div className="section-title">{t('settings.playback')}</div>
       <div className="card">
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="bitrate">Qualité du streaming</label>
+          <label htmlFor="bitrate">{t('settings.streamQuality')}</label>
           <select
             id="bitrate"
             className="select"
@@ -119,53 +132,53 @@ export default function Settings() {
           >
             {BITRATES.map((b) => (
               <option key={b.value} value={b.value}>
-                {b.label}
+                {t(b.label as Key)}
               </option>
             ))}
           </select>
           <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, padding: '0 6px' }}>
-            Réduisez la qualité pour économiser vos données mobiles. Les titres téléchargés sont toujours lus en local.
+            {t('settings.streamHint')}
           </p>
         </div>
       </div>
 
-      <div className="section-title">Téléchargements</div>
+      <div className="section-title">{t('settings.downloads')}</div>
       <div className="card">
         <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="dlq">Format des fichiers téléchargés</label>
+          <label htmlFor="dlq">{t('settings.downloadFormat')}</label>
           <select
             id="dlq"
             className="select"
             value={settings.downloadQuality}
             onChange={(e) => settings.update({ downloadQuality: e.target.value as DownloadQuality })}
           >
-            <option value="original">Fichier d'origine (meilleure qualité)</option>
-            <option value="mp3">MP3 320 kb/s (plus léger, compatible partout)</option>
+            <option value="original">{t('settings.formatOriginal')}</option>
+            <option value="mp3">{t('settings.formatMp3')}</option>
           </select>
         </div>
         <div className="row" style={{ marginTop: 18, justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ fontSize: 13.5, lineHeight: 1.5 }}>
             <strong>
-              {plural(dlCount, 'titre')} · {formatBytes(dlSize)}
+              {tn('common.tracks', dlCount)} · {formatBytes(dlSize)}
             </strong>
             <div className="muted" style={{ fontSize: 12.5 }}>
-              {pending > 0 ? `${pending} en cours de téléchargement · ` : ''}
-              {free !== null ? `${formatBytes(free)} libres sur l'appareil` : 'Stockés sur cet appareil'}
+              {pending > 0 ? t('settings.inProgress', { n: pending }) : ''}
+              {free !== null ? t('settings.free', { size: formatBytes(free) }) : t('settings.storedHere')}
             </div>
           </div>
           <button className="btn sm danger" disabled={!dlCount && !pending} onClick={() => setConfirmClear(true)}>
-            Tout supprimer
+            {t('settings.deleteAll')}
           </button>
         </div>
         <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, marginTop: 12, padding: '0 2px' }}>
-          Les titres téléchargés sont toujours lus depuis l'appareil en priorité. Pour télécharger, utilisez l'icône ⤓ d'un album ou le menu ⋯ d'un titre.
+          {t('settings.downloadsHint')}
         </p>
       </div>
 
-      <div className="section-title">Serveur de demandes</div>
+      <div className="section-title">{t('settings.requestsServer')}</div>
       <div className="card">
         <div className="field">
-          <label htmlFor="rqurl">Adresse du serveur Soundy</label>
+          <label htmlFor="rqurl">{t('settings.requestsAddress')}</label>
           <div className="input-wrap">
             <IconServer />
             <input
@@ -174,7 +187,7 @@ export default function Settings() {
               inputMode="url"
               autoCapitalize="off"
               spellCheck={false}
-              placeholder={isNative() ? 'https://soundy.mondomaine.fr' : 'Même adresse que l’application'}
+              placeholder={isNative() ? 'https://soundy.example.com' : t('settings.sameAddress')}
               value={requestsUrl}
               onChange={(e) => setRequestsUrl(e.target.value)}
               onBlur={() => settings.update({ requestsUrl: requestsUrl.trim().replace(/\/+$/, '') })}
@@ -182,31 +195,31 @@ export default function Settings() {
           </div>
         </div>
         <button className="btn sm" onClick={() => void testRequests()} disabled={testing}>
-          {testing ? 'Test en cours…' : 'Tester la connexion'}
+          {testing ? t('settings.testing') : t('settings.test')}
         </button>
       </div>
 
       <div style={{ marginTop: 34 }}>
         <button className="btn block danger" onClick={() => setConfirm(true)}>
-          <IconLogout /> Se déconnecter
+          <IconLogout /> {t('settings.logout')}
         </button>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30 }}>
         <Brand size={34} />
       </div>
       <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 10 }}>
-        Soundy v{APP_VERSION} · build du {__BUILD__}
+        {t('settings.version', { version: APP_VERSION, build: __BUILD__ })}
       </p>
 
       <Sheet
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
-        title="Supprimer les téléchargements ?"
-        description={`${plural(dlCount, 'titre')} (${formatBytes(dlSize)}) seront retirés de cet appareil. Ils restent disponibles en streaming.`}
+        title={t('settings.clearTitle')}
+        description={t('settings.clearText', { tracks: tn('common.tracks', dlCount), size: formatBytes(dlSize) })}
       >
         <div className="row" style={{ gap: 14 }}>
           <button className="btn block" onClick={() => setConfirmClear(false)}>
-            Annuler
+            {t('common.cancel')}
           </button>
           <button
             className="btn block danger"
@@ -215,7 +228,7 @@ export default function Settings() {
               setConfirmClear(false);
             }}
           >
-            Supprimer
+            {t('common.delete')}
           </button>
         </div>
       </Sheet>
@@ -223,12 +236,12 @@ export default function Settings() {
       <Sheet
         open={confirm}
         onClose={() => setConfirm(false)}
-        title="Se déconnecter ?"
-        description="Les titres téléchargés restent sur l'appareil et seront disponibles à votre prochaine connexion."
+        title={t('settings.logoutTitle')}
+        description={t('settings.logoutText')}
       >
         <div className="row" style={{ gap: 14 }}>
           <button className="btn block" onClick={() => setConfirm(false)}>
-            Annuler
+            {t('common.cancel')}
           </button>
           <button
             className="btn block danger"
@@ -238,7 +251,7 @@ export default function Settings() {
               logout();
             }}
           >
-            Déconnexion
+            {t('settings.logoutButton')}
           </button>
         </div>
       </Sheet>

@@ -5,12 +5,16 @@ import { Brand } from '../components/Brand';
 import { IconLock, IconServer, IconUser } from '../components/Icons';
 import { useAuth } from '../store/auth';
 import { useNetwork } from '../store/network';
+import { useSettings } from '../store/settings';
+import { useT } from '../i18n';
 
 const LAST_SERVER = 'soundy.lastServer';
 
 export default function Login() {
   const setSession = useAuth((s) => s.setSession);
   const online = useNetwork((s) => s.online);
+  const { t, lang } = useT();
+  const updateSettings = useSettings((s) => s.update);
   const [step, setStep] = useState<'intro' | 'form'>(localStorage.getItem(LAST_SERVER) ? 'form' : 'intro');
   const [server, setServer] = useState(localStorage.getItem(LAST_SERVER) ?? import.meta.env.VITE_EMBY_URL ?? '');
   const [user, setUser] = useState('');
@@ -32,14 +36,14 @@ export default function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!server.trim() || !user.trim()) return setError("Renseignez l'adresse du serveur et votre identifiant.");
+    if (!server.trim() || !user.trim()) return setError(t('login.missing'));
     setLoading(true);
     try {
       const session = await login(server, user.trim(), password);
       localStorage.setItem(LAST_SERVER, session.server);
       setSession(session);
     } catch (err) {
-      setError((err as Error).message || 'Connexion impossible.');
+      setError((err as Error).message || t('login.failed'));
     } finally {
       setLoading(false);
     }
@@ -47,7 +51,16 @@ export default function Login() {
 
   return (
     <div className={`welcome ${step === 'form' ? 'form' : ''}`}>
-      <Brand size={44} />
+      <div className="welcome-top">
+        <Brand size={44} />
+        <div className="lang-switch" role="group" aria-label={t('lang.label')}>
+          {(['fr', 'en'] as const).map((l) => (
+            <button key={l} className={lang === l ? 'on' : ''} onClick={() => updateSettings({ language: l })} aria-pressed={lang === l}>
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="discs" aria-hidden>
         <div className="half" />
         <div className="half" />
@@ -68,24 +81,24 @@ export default function Login() {
       {step === 'intro' ? (
         <>
           <h1 className="headline">
-            <span>Le nouvel</span>
-            <span>âge de la</span>
-            <span>musique</span>
+            <span>{t('login.headline1')}</span>
+            <span>{t('login.headline2')}</span>
+            <span>{t('login.headline3')}</span>
           </h1>
-          <p className="tagline">Toute votre bibliothèque Emby, en streaming ou hors ligne, sur tous vos appareils.</p>
+          <p className="tagline">{t('login.tagline')}</p>
           <button className="btn block" onClick={() => setStep('form')} style={{ height: 60, fontSize: 16 }}>
-            Commencer
+            {t('login.start')}
           </button>
         </>
       ) : (
         <form className="login-card" onSubmit={submit} style={{ marginTop: 'auto', marginBottom: 'auto', paddingTop: 20 }}>
-          <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>Connexion</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em' }}>{t('login.title')}</h1>
           <p className="tagline" style={{ margin: '8px 0 28px' }}>
-            Connectez-vous avec votre compte Emby.
+            {t('login.subtitle')}
           </p>
 
           <div className="field">
-            <label htmlFor="server">Adresse du serveur Emby</label>
+            <label htmlFor="server">{t('login.server')}</label>
             <div className="input-wrap">
               <IconServer />
               <input
@@ -95,35 +108,35 @@ export default function Login() {
                 autoCapitalize="off"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="https://musique.mondomaine.fr"
+                placeholder={t('login.serverPlaceholder')}
                 value={server}
                 onChange={(e) => setServer(e.target.value)}
               />
             </div>
           </div>
           <div className="field">
-            <label htmlFor="user">Identifiant</label>
+            <label htmlFor="user">{t('login.user')}</label>
             <div className="input-wrap">
               <IconUser />
               <input id="user" autoComplete="username" autoCapitalize="off" value={user} onChange={(e) => setUser(e.target.value)} />
             </div>
           </div>
           <div className="field">
-            <label htmlFor="password">Mot de passe</label>
+            <label htmlFor="password">{t('login.password')}</label>
             <div className="input-wrap">
               <IconLock />
               <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
           </div>
 
-          {!online && <p className="error-text">Aucune connexion Internet.</p>}
+          {!online && <p className="error-text">{t('login.noNetwork')}</p>}
           {error && <p className="error-text">{error}</p>}
 
           <button className="btn accent block" type="submit" disabled={loading || !online} style={{ marginTop: 18, height: 58 }}>
-            {loading ? <span className="loader" style={{ width: 20, height: 20 }} /> : 'Se connecter'}
+            {loading ? <span className="loader" style={{ width: 20, height: 20 }} /> : t('login.submit')}
           </button>
           <button type="button" className="btn block" style={{ marginTop: 18, boxShadow: 'none', color: 'var(--text-2)' }} onClick={() => setStep('intro')}>
-            Retour
+            {t('common.back')}
           </button>
         </form>
       )}

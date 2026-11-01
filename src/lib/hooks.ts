@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Page } from '../api/emby';
+import { t } from '../i18n';
 
 interface PagedState<T> {
   items: T[];
@@ -51,7 +52,7 @@ export function usePaged<T>(key: string | null, fetchPage: (start: number, signa
       cache.set(key, next);
       setState(next);
     } catch (e) {
-      if (!c.signal.aborted) setError((e as Error).message || 'Erreur de chargement');
+      if (!c.signal.aborted) setError((e as Error).message || t('emby.loadError'));
     } finally {
       if (!c.signal.aborted) {
         busy.current = false;

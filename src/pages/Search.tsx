@@ -6,6 +6,7 @@ import { Empty } from '../components/Empty';
 import { IconAlert, IconSearch, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { TrackRow } from '../components/TrackRow';
+import { useT } from '../i18n';
 import { mergeAlbums } from '../lib/albums';
 import { useDebounced } from '../lib/hooks';
 import { useAuth } from '../store/auth';
@@ -37,6 +38,7 @@ export default function Search() {
   const [filter, setFilter] = useState<Filter>((params.get('f') as Filter) || 'all');
   const debounced = useDebounced(query.trim(), 350);
   const client = useAuth((s) => s.client);
+  const { t } = useT();
   const online = useNetwork((s) => s.online);
   const downloaded = useDownloads((s) => s.downloaded);
   const playQueue = usePlayer((s) => s.playQueue);
@@ -99,7 +101,7 @@ export default function Search() {
   return (
     <div className="page">
       <header className="page-header">
-        <h1 className="page-title">Recherche</h1>
+        <h1 className="page-title">{t('search.title')}</h1>
       </header>
 
       <div className="input-wrap" style={{ marginBottom: 20 }}>
@@ -109,10 +111,10 @@ export default function Search() {
           type="search"
           inputMode="search"
           enterKeyHint="search"
-          placeholder="Album, titre, artiste…"
+          placeholder={t('search.placeholder')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Rechercher"
+          aria-label={t('search.label')}
           autoFocus={!query}
         />
         {loading ? (
@@ -121,7 +123,7 @@ export default function Search() {
           query && (
             <button
               className="icon-btn sm flat"
-              aria-label="Effacer"
+              aria-label={t('search.clear')}
               onClick={() => {
                 setQuery('');
                 inputRef.current?.focus();
@@ -134,20 +136,20 @@ export default function Search() {
       </div>
 
       <Segmented<Filter>
-        label="Filtrer les résultats"
+        label={t('search.filter')}
         value={filter}
         onChange={setFilter}
         options={[
-          { value: 'all', label: 'Tout' },
-          { value: 'albums', label: 'Albums' },
-          { value: 'tracks', label: 'Titres' },
+          { value: 'all', label: t('search.all') },
+          { value: 'albums', label: t('search.albums') },
+          { value: 'tracks', label: t('search.tracks') },
         ]}
       />
 
       {!debounced && recent.length > 0 && online && (
         <>
           <div className="section-title">
-            Recherches récentes
+            {t('search.recent')}
             <button
               className="muted"
               style={{ fontSize: 12, letterSpacing: 0, textTransform: 'none' }}
@@ -156,7 +158,7 @@ export default function Search() {
                 localStorage.removeItem(RECENT_KEY);
               }}
             >
-              Effacer
+              {t('search.clearRecent')}
             </button>
           </div>
           <div className="chips" style={{ flexWrap: 'wrap' }}>
@@ -170,14 +172,14 @@ export default function Search() {
       )}
 
       {!debounced && !recent.length && (
-        <Empty icon={<IconSearch />} title="Trouvez votre musique" text="Recherchez un album ou un titre dans toute la bibliothèque Emby." />
+        <Empty icon={<IconSearch />} title={t('search.hint')} text={t('search.hintText')} />
       )}
 
-      {error && <Empty icon={<IconAlert />} title="La recherche a échoué" text={error} />}
+      {error && <Empty icon={<IconAlert />} title={t('search.failed')} text={error} />}
 
       {showAlbums && (
         <>
-          <div className="section-title">Albums · {data!.albums.length}</div>
+          <div className="section-title">{t('search.albumsCount', { n: data!.albums.length })}</div>
           {filter === 'all' ? (
             <div className="h-scroll">
               {data!.albums.map((a) => (
@@ -197,7 +199,7 @@ export default function Search() {
       {showTracks && (
         <>
           <div className="section-title" style={filter === 'all' && showAlbums ? { marginTop: 4 } : undefined}>
-            Titres · {data!.tracks.length}
+            {t('search.tracksCount', { n: data!.tracks.length })}
           </div>
           <div className="track-list">
             {data!.tracks.map((t, i) => (
@@ -210,8 +212,8 @@ export default function Search() {
       {nothing && !loading && (
         <Empty
           icon={<IconSearch />}
-          title="Aucun résultat"
-          text={`Rien ne correspond à « ${debounced} »${online ? '. Vous pouvez demander son ajout dans l’onglet Demandes.' : ' parmi vos titres téléchargés.'}`}
+          title={t('search.noResult')}
+          text={t(online ? 'search.noResultOnline' : 'search.noResultOffline', { q: debounced })}
         />
       )}
     </div>
