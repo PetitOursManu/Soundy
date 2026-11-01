@@ -1,16 +1,78 @@
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Album } from '../api/emby';
+import { albumPath } from '../lib/albums';
 import { Cover } from './Cover';
-import { IconDownloaded } from './Icons';
+import { IconCheck, IconDownloaded } from './Icons';
 
-export const AlbumCard = memo(function AlbumCard({ album, downloaded }: { album: Album; downloaded?: boolean }) {
+interface Props {
+  album: Album;
+  downloaded?: boolean;
+  /** Mode sélection : un appui coche / décoche l'album au lieu de l'ouvrir. */
+  selecting?: boolean;
+  selected?: boolean;
+  onToggle?: (album: Album) => void;
+  /** Appui long (mobile) ou clic droit : entre en mode sélection. */
+  onLongPress?: (album: Album) => void;
+}
+
+export const AlbumCard = memo(function AlbumCard({ album, downloaded, selecting, selected, onToggle, onLongPress }: Props) {
+  const timer = useRef<number>();
+  const longPressed = useRef(false);
+  const start = useRef({ x: 0, y: 0 });
+
+  const cancel = () => clearTimeout(timer.current);
+
   return (
-    <Link to={`/album/${album.id}`} className="album-card" state={{ album }}>
-      {downloaded && (
-        <span className="dl-badge" title="Téléchargé">
-          <IconDownloaded />
+    <Link
+      to={albumPath(album)}
+      className={`album-card ${selecting ? 'selecting' : ''} ${selected ? 'selected' : ''}`}
+      state={{ album }}
+      aria-pressed={selecting ? selected : undefined}
+      onClick={(e) => {
+        if (longPressed.current) {
+          e.preventDefault();
+          longPressed.current = false;
+          return;
+        }
+        if (selecting) {
+          e.preventDefault();
+          onToggle?.(album);
+        }
+      }}
+      onContextMenu={(e) => {
+        if (!onLongPress) return;
+        e.preventDefault();
+        if (selecting) onToggle?.(album);
+        else onLongPress(album);
+      }}
+      onPointerDown={(e) => {
+        if (!onLongPress || e.pointerType === 'mouse') return;
+        start.current = { x: e.clientX, y: e.clientY };
+        longPressed.current = false;
+        timer.current = window.setTimeout(() => {
+          longPressed.current = true;
+          navigator.vibrate?.(15);
+          if (selecting) onToggle?.(album);
+          else onLongPress(album);
+        }, 500);
+      }}
+      onPointerMove={(e) => {
+        if (Math.abs(e.clientX - start.current.x) + Math.abs(e.clientY - start.current.y) > 10) cancel();
+      }}
+      onPointerUp={cancel}
+      onPointerCancel={cancel}
+    >
+      {selecting ? (
+        <span className="select-dot" aria-hidden>
+          {selected && <IconCheck />}
         </span>
+      ) : (
+        downloaded && (
+          <span className="dl-badge" title="Téléchargé">
+            <IconDownloaded />
+          </span>
+        )
       )}
       <div className="cover-ring">
         <Cover imageId={album.coverId ?? (album.imageTag ? album.id : undefined)} tag={album.imageTag} alt={album.title} />

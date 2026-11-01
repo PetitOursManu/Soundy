@@ -6,6 +6,7 @@ import { Empty } from '../components/Empty';
 import { IconAlert, IconSearch, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { TrackRow } from '../components/TrackRow';
+import { mergeAlbums } from '../lib/albums';
 import { useDebounced } from '../lib/hooks';
 import { useAuth } from '../store/auth';
 import { useDownloads } from '../store/downloads';
@@ -73,7 +74,7 @@ export default function Search() {
     client
       .search(debounced, ctrl.signal)
       .then((r) => {
-        setResults(r);
+        setResults({ ...r, albums: mergeAlbums(r.albums) });
         setLoading(false);
         // Mémorise la recherche
         setRecent((prev) => {

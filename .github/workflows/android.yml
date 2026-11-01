@@ -1,9 +1,17 @@
-# Compile automatiquement l'application Android (APK) à chaque push.
-# - Push classique : APK téléchargeable dans l'onglet « Actions » → « Artifacts ».
-# - Push sur main : si la version de package.json (ex. 1.0.0) n'a pas encore de
-#   Release, une Release GitHub « v1.0.0 » est créée automatiquement avec l'APK.
-#   Pour publier une nouvelle version : augmentez "version" dans package.json.
-# - Étiquette de version (ex. v1.0.0) ou lancement manuel avec une version : idem.
+# Compile l'application Android (APK) à chaque push.
+#
+# - Chaque push : APK téléchargeable dans l'onglet « Actions » → « Artifacts ».
+# - Push sur main : si la version de package.json (ex. 1.1.0) n'a pas encore de
+#   Release, une Release GitHub « v1.1.0 » est créée avec l'APK.
+#   → Pour publier une nouvelle version : augmentez "version" dans package.json.
+#
+# Signature : pour que les mises à jour s'installent PAR-DESSUS l'ancienne version
+# (et conservent les titres téléchargés), l'APK doit toujours être signé avec la
+# même clé. Elle est fournie par deux secrets du dépôt :
+#   SOUNDY_KEYSTORE_BASE64   (contenu du fichier .jks encodé en base64)
+#   SOUNDY_KEYSTORE_PASSWORD (mot de passe de la clé)
+# Sans ces secrets, l'APK est compilé avec une clé temporaire et AUCUNE Release
+# n'est publiée (pour ne pas casser les mises à jour).
 name: Android APK
 
 on:
@@ -13,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version à publier en Release (ex. v1.0.0) — laisser vide pour une simple compilation"
+        description: "Version à publier en Release (ex. v1.1.0) — vide = simple compilation"
         required: false
         default: ""
 
@@ -49,16 +57,39 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Clé de signature
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.SOUNDY_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SOUNDY_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/soundy.jks"
+            echo "SOUNDY_KEYSTORE_FILE=$RUNNER_TEMP/soundy.jks" >> "$GITHUB_ENV"
+            echo "SOUNDY_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "✅ APK signé avec la clé Soundy"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Secrets SOUNDY_KEYSTORE_BASE64 / SOUNDY_KEYSTORE_PASSWORD absents : APK signé avec une clé temporaire, aucune Release ne sera publiée."
+          fi
+
       - name: Compilation de l'APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          if [ "${{ steps.sign.outputs.signed }}" = "true" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace
+            cp app/build/outputs/apk/release/app-release.apk ../soundy.apk
+          else
+            ./gradlew assembleDebug --no-daemon --stacktrace
+            cp app/build/outputs/apk/debug/app-debug.apk ../soundy.apk
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: soundy-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: soundy.apk
           if-no-files-found: error
 
       - name: Version à publier
@@ -68,14 +99,18 @@ jobs:
           if [ -z "$V" ] && [[ "$GITHUB_REF" == refs/tags/v* ]]; then V="$GITHUB_REF_NAME"; fi
           if [ -z "$V" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
             V="v$(node -p "require('./package.json').version")"
-            # Déjà publiée ? On ne refait pas la Release
-            if git ls-remote --exit-code --tags origin "refs/tags/$V" >/dev/null 2>&1; then
-              echo "La release $V existe déjà, rien à publier."
-              V=""
-            fi
+          fi
+          if [ -n "$V" ] && [ "${{ steps.sign.outputs.signed }}" != "true" ]; then
+            echo "::warning::Release $V non publiée : ajoutez les secrets de signature puis relancez ce workflow."
+            V=""
+          fi
+          # Déjà publiée ? On ne refait pas la Release
+          if [ -n "$V" ] && git ls-remote --exit-code --tags origin "refs/tags/$V" >/dev/null 2>&1; then
+            echo "La release $V existe déjà, rien à publier."
+            V=""
           fi
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          if [ -n "$V" ]; then cp android/app/build/outputs/apk/debug/app-debug.apk "Soundy-$V.apk"; fi
+          if [ -n "$V" ]; then cp soundy.apk "Soundy-$V.apk"; fi
 
       - name: Publication de la Release GitHub
         if: steps.rel.outputs.version != ''
@@ -93,5 +128,5 @@ jobs:
             3. Connectez-vous avec votre compte Emby, puis indiquez l'adresse de votre serveur Soundy
                dans *Réglages → Serveur de demandes* (pour l'onglet Demandes).
 
-            > APK signé avec une clé de développement : pour une mise à jour, il peut être nécessaire
-            > de désinstaller la version précédente.
+            🔄 **Mise à jour** : installez simplement le nouvel APK par-dessus l'ancien,
+            vos titres téléchargés et votre connexion sont conservés.

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { Album, SortKey, Track } from '../api/emby';
 import { AlbumCard, AlbumCardSkeleton } from '../components/AlbumCard';
 import { Brand } from '../components/Brand';
 import { Empty } from '../components/Empty';
-import { IconAlert, IconCloudOff, IconDisc, IconList, IconSettings, IconShuffle } from '../components/Icons';
+import { IconAlert, IconCheck, IconCloudOff, IconDisc, IconDownload, IconList, IconSettings, IconShuffle, IconX } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { TrackWheel } from '../components/TrackWheel';
+import { artistTokens, mergeAlbums, normName } from '../lib/albums';
 import { usePaged, useScrollRestore, useSentinel } from '../lib/hooks';
 import { useAuth } from '../store/auth';
 import { useDownloads } from '../store/downloads';
@@ -34,11 +35,12 @@ const TRACK_SORTS: { value: SortKey; label: string }[] = [
 export function groupByAlbum(tracks: DownloadedTrack[]): (Album & { tracks: DownloadedTrack[] })[] {
   const map = new Map<string, Album & { tracks: DownloadedTrack[] }>();
   for (const t of tracks) {
-    const key = t.albumId || `single-${t.id}`;
+    const key = t.album ? `${normName(t.album)}|${artistTokens(t.albumArtist || t.artist)[0] ?? ''}` : `single-${t.id}`;
     let a = map.get(key);
     if (!a) {
       a = {
-        id: key,
+        id: t.albumId || `single-${t.id}`,
+        ids: [],
         title: t.album || t.title,
         artist: t.albumArtist || t.artist,
         imageTag: t.imageTag,
@@ -48,7 +50,9 @@ export function groupByAlbum(tracks: DownloadedTrack[]): (Album & { tracks: Down
       map.set(key, a);
     }
     a.tracks.push(t);
+    if (t.albumId && !a.ids!.includes(t.albumId)) a.ids!.push(t.albumId);
   }
+  for (const a of map.values()) if (!a.ids!.length) a.ids = [a.id];
   for (const a of map.values()) a.tracks.sort((x, y) => (x.disc ?? 0) - (y.disc ?? 0) || (x.index ?? 0) - (y.index ?? 0));
   return [...map.values()].sort((a, b) => a.title.localeCompare(b.title, 'fr'));
 }
@@ -85,6 +89,55 @@ export default function Library() {
   useEffect(() => {
     if (online && view === 'tracks' && !tracks.items.length && !tracks.done && !tracks.loading && !tracks.error) void tracks.loadMore();
   }, [online, view, tracks]);
+
+  // Albums éclatés par Emby réunis (voir lib/albums.ts)
+  const mergedAlbums = useMemo(() => mergeAlbums(albums.items), [albums.items]);
+
+  // --- Sélection multiple (téléchargement de plusieurs albums) ---------------
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Map<string, Album>>(new Map());
+  const [busy, setBusy] = useState(false);
+  const keyOf = (a: Album) => (a.ids ?? [a.id]).join(',');
+  const toggleAlbum = useCallback((a: Album) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      const k = (a.ids ?? [a.id]).join(',');
+      if (next.has(k)) next.delete(k);
+      else next.set(k, a);
+      return next;
+    });
+  }, []);
+  const startSelect = useCallback(
+    (a?: Album) => {
+      setSelecting(true);
+      setSelected(a ? new Map([[(a.ids ?? [a.id]).join(','), a]]) : new Map());
+    },
+    [],
+  );
+  const stopSelect = () => {
+    setSelecting(false);
+    setSelected(new Map());
+  };
+  useEffect(() => {
+    if (view !== 'albums' || !online) stopSelect();
+  }, [view, online]);
+
+  const downloadSelected = async () => {
+    const list = [...selected.values()];
+    if (!list.length || !client) return;
+    setBusy(true);
+    try {
+      const all: Track[] = [];
+      for (const a of list) all.push(...(await client.getTracksOfAlbums(a.ids ?? [a.id])));
+      useDownloads.getState().download(all);
+      toast(`${list.length} album${list.length > 1 ? 's' : ''} · ${all.length} titres ajoutés aux téléchargements`, 'success');
+      stopSelect();
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Albums dont au moins un titre est téléchargé (badge)
   const downloadedAlbums = useMemo(() => new Set(Object.values(downloaded).map((t) => t.albumId)), [downloaded]);
@@ -147,8 +200,14 @@ export default function Library() {
           ))}
           {list.total > 0 && (
             <span className="muted" style={{ alignSelf: 'center', fontSize: 12.5, whiteSpace: 'nowrap', paddingLeft: 4 }}>
-              {list.total.toLocaleString('fr-FR')} {view === 'albums' ? 'albums' : 'titres'}
+              {(view === 'albums' ? Math.max(mergedAlbums.length, list.total - (albums.items.length - mergedAlbums.length)) : list.total).toLocaleString('fr-FR')}{' '}
+              {view === 'albums' ? 'albums' : 'titres'}
             </span>
+          )}
+          {view === 'albums' && (
+            <button className={`chip ${selecting ? 'on' : ''}`} onClick={() => (selecting ? stopSelect() : startSelect())} style={{ marginLeft: 'auto' }}>
+              {selecting ? 'Annuler' : 'Sélectionner'}
+            </button>
           )}
         </div>
       )}
@@ -157,8 +216,16 @@ export default function Library() {
         {online ? (
           view === 'albums' ? (
             <div className="album-grid">
-              {albums.items.map((a) => (
-                <AlbumCard key={a.id} album={a} downloaded={downloadedAlbums.has(a.id)} />
+              {mergedAlbums.map((a) => (
+                <AlbumCard
+                  key={a.id}
+                  album={a}
+                  downloaded={(a.ids ?? [a.id]).some((id) => downloadedAlbums.has(id))}
+                  selecting={selecting}
+                  selected={selected.has(keyOf(a))}
+                  onToggle={toggleAlbum}
+                  onLongPress={startSelect}
+                />
               ))}
               {albums.loading && Array.from({ length: albums.items.length ? 2 : 6 }, (_, i) => <AlbumCardSkeleton key={`sk${i}`} />)}
             </div>
@@ -195,6 +262,31 @@ export default function Library() {
         )}
         {view === 'albums' && <div ref={sentinel} className="sentinel" />}
       </div>
+
+      {selecting && (
+        <div className="select-bar" role="toolbar" aria-label="Sélection d'albums">
+          <button className="icon-btn flat" onClick={stopSelect} aria-label="Quitter la sélection">
+            <IconX />
+          </button>
+          <div className="meta">
+            <strong>
+              {selected.size} album{selected.size > 1 ? 's' : ''}
+            </strong>
+            <button
+              className="link"
+              onClick={() =>
+                setSelected(selected.size === mergedAlbums.length ? new Map() : new Map(mergedAlbums.map((a) => [keyOf(a), a])))
+              }
+            >
+              <IconCheck /> {selected.size === mergedAlbums.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+            </button>
+          </div>
+          <button className="btn accent sm" disabled={!selected.size || busy} onClick={() => void downloadSelected()}>
+            {busy ? <span className="loader" style={{ width: 16, height: 16 }} /> : <IconDownload />}
+            Télécharger
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,15 @@
 apply plugin: 'com.android.application'
 
+// Version de l'application lue dans package.json (ex. 1.2.3 → versionCode 10203)
+def soundyVersion = new groovy.json.JsonSlurper().parse(file('../../package.json')).version
+def soundyParts = soundyVersion.tokenize('.').collect { it.replaceAll('[^0-9]', '') ?: '0' }.collect { it as int }
+def soundyVersionCode = soundyParts[0] * 10000 + soundyParts[1] * 100 + soundyParts[2]
+
+// Clé de signature fixe (fournie par les secrets GitHub, jamais versionnée) :
+// indispensable pour que les mises à jour s'installent par-dessus l'ancienne
+// version sans perdre les titres téléchargés.
+def soundyKeystore = System.getenv('SOUNDY_KEYSTORE_FILE')
+
 android {
     namespace "fr.soundy.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +17,8 @@ android {
         applicationId "fr.soundy.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode soundyVersionCode
+        versionName soundyVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +26,19 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (soundyKeystore) {
+            soundy {
+                storeFile file(soundyKeystore)
+                storePassword System.getenv('SOUNDY_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('SOUNDY_KEY_ALIAS') ?: 'soundy'
+                keyPassword System.getenv('SOUNDY_KEYSTORE_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (soundyKeystore) signingConfig signingConfigs.soundy
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

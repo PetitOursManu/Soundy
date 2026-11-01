@@ -1,8 +1,9 @@
 // Client minimal pour l'API Emby.
 // Documentation : https://dev.emby.media/doc/restapi/index.html
+import { sameAlbum } from '../lib/albums';
 
 export const APP_NAME = 'Soundy';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = __APP_VERSION__;
 
 export interface Session {
   server: string; // URL de base d'Emby, sans "/" final (ex : https://music.exemple.fr ou https://exemple.fr/emby)
@@ -35,6 +36,7 @@ export interface Album {
   trackCount?: number;
   imageTag?: string;
   coverId?: string; // item portant la pochette, si différent de l'album
+  ids?: string[]; // identifiants Emby réunis (album éclaté par Emby, voir lib/albums.ts)
 }
 
 interface EmbyItem {
@@ -289,6 +291,34 @@ export class EmbyClient {
       Fields: TRACK_FIELDS,
     });
     return r.Items.map(toTrack);
+  }
+
+  /** Titres de plusieurs albums Emby réunis (sans doublon, triés disque → piste). */
+  async getTracksOfAlbums(ids: string[]): Promise<Track[]> {
+    const lists = await Promise.all(ids.map((id) => this.getAlbumTracks(id)));
+    const seen = new Set<string>();
+    const all = lists.flat().filter((t) => !seen.has(t.id) && seen.add(t.id));
+    if (ids.length > 1) {
+      all.sort((a, b) => (a.disc ?? 1) - (b.disc ?? 1) || (a.index ?? 9999) - (b.index ?? 9999) || a.title.localeCompare(b.title, 'fr'));
+    }
+    return all;
+  }
+
+  /** Autres « morceaux » du même album qu'Emby aurait séparés (même nom, artiste commun). */
+  async findAlbumVersions(album: Album): Promise<Album[]> {
+    if (!album.title.trim()) return [];
+    try {
+      const r = await this.items({
+        IncludeItemTypes: 'MusicAlbum',
+        Recursive: true,
+        SearchTerm: album.title,
+        Fields: ALBUM_FIELDS,
+        Limit: 100,
+      });
+      return r.Items.map(toAlbum).filter((a) => sameAlbum(a, album));
+    } catch {
+      return [];
+    }
   }
 
   async getRandomTracks(limit = 100): Promise<Track[]> {

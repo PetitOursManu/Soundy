@@ -25,14 +25,17 @@ export default function AlbumPage() {
   const [tracks, setTracks] = useState<Track[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  // Un album peut réunir plusieurs albums Emby (album « éclaté », voir lib/albums.ts)
+  const idList = useMemo(() => id.split(',').filter(Boolean), [id]);
+  const [allIds, setAllIds] = useState<string[]>(idList);
 
   // Titres téléchargés de cet album (mode hors ligne)
   const localTracks = useMemo(
     () =>
       Object.values(downloaded)
-        .filter((t) => t.albumId === id || `single-${t.id}` === id)
+        .filter((t) => (t.albumId && allIds.includes(t.albumId)) || `single-${t.id}` === id)
         .sort((a, b) => (a.disc ?? 0) - (b.disc ?? 0) || (a.index ?? 0) - (b.index ?? 0)),
-    [downloaded, id],
+    [downloaded, id, allIds],
   );
 
   useEffect(() => {
@@ -42,17 +45,24 @@ export default function AlbumPage() {
       setTracks(null);
       return;
     }
-    Promise.all([client.getAlbum(id), client.getAlbumTracks(id)])
-      .then(([a, t]) => {
-        if (!alive) return;
-        setAlbum(a);
-        setTracks(t);
-      })
-      .catch((e) => alive && setError((e as Error).message));
+    (async () => {
+      const main = await client.getAlbum(idList[0]);
+      // Réunit les morceaux de l'album qu'Emby aurait séparés
+      const versions = await client.findAlbumVersions(main);
+      const ids = [...idList];
+      for (const v of versions) if (!ids.includes(v.id)) ids.push(v.id);
+      const t = await client.getTracksOfAlbums(ids);
+      if (!alive) return;
+      const artists = [main.artist, ...versions.map((v) => v.artist)].filter(Boolean);
+      const shortest = artists.reduce((a, b) => (b.length < a.length ? b : a), main.artist);
+      setAllIds(ids);
+      setAlbum({ ...main, artist: shortest, ids });
+      setTracks(t);
+    })().catch((e) => alive && setError((e as Error).message));
     return () => {
       alive = false;
     };
-  }, [id, online, client]);
+  }, [id, idList, online, client]);
 
   const list: Track[] = tracks ?? (online && !id.startsWith('single-') ? [] : localTracks);
   const first = list[0] ?? localTracks[0];

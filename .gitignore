@@ -12,3 +12,8 @@ android/app/src/main/assets/public
 server/node_modules
 tsconfig.tsbuildinfo
 comparaison-roue.png
+
+# Clé de signature Android : NE JAMAIS la publier
+signing/
+*.jks
+*.keystore
