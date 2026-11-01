@@ -2090,7 +2090,16 @@ input[type='search']::-webkit-search-decoration {
   flex: none;
 }
 
+.wheel-item.focused .wheel-text {
+  padding-right: 108px;
+}
+
+.wheel-item:not(.focused) .wheel-actions {
+  pointer-events: none;
+}
+
 .wheel-actions {
+  will-change: opacity;
   position: absolute;
   right: 12px;
   top: 50%;

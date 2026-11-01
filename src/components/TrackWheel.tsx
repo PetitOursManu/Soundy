@@ -113,14 +113,10 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
       const dim = n.el.dataset.dim === '1' ? 0.45 : 1;
       n.el.style.transform = `translate3d(${x.toFixed(2)}px, ${(y - g.cover / 2).toFixed(2)}px, 0) rotate(${rot.toFixed(4)}rad) scale(${scale.toFixed(4)})`;
       n.el.style.opacity = String(Math.max(0, 1 - ad * 0.14) * dim);
-      n.el.style.zIndex = String(100 - Math.round(ad * 10));
       if (n.pill) n.pill.style.opacity = String(near);
-      if (n.actions) {
-        n.actions.style.opacity = String(near);
-        n.actions.style.pointerEvents = near > 0.6 ? 'auto' : 'none';
-      }
-      if (n.text) n.text.style.paddingRight = `${Math.round(near * 108)}px`;
+      if (n.actions) n.actions.style.opacity = String(near);
     });
+    if ((window as unknown as { __soundyDebug?: boolean }).__soundyDebug) (window as unknown as { __wheelPos: number }).__wheelPos = pos;
     if (thumbRef.current) {
       thumbRef.current.style.top = `${(clamp(pos, 0, maxRef.current) / Math.max(1, countRef.current - 1)) * 100}%`;
     }
@@ -165,34 +161,50 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
 
   // --- Animation vers la cible (ressort amorti) -----------------------------
   const velocity = useRef(0);
+  // "follow" : la roue colle au geste (trackpad / inertie) ; "spring" : calage doux sur un titre
+  const motion = useRef<'follow' | 'spring'>('spring');
   const animate = useCallback(() => {
-    cancelAnimationFrame(raf.current);
+    if (raf.current) return; // une seule boucle d'animation à la fois
     let last = performance.now();
     const step = (now: number) => {
       const dt = Math.min(0.032, (now - last) / 1000);
       last = now;
-      // Ressort critique : mouvement doux, sans rebond
-      const k = 170; // raideur
-      const c = 2 * Math.sqrt(k); // amortissement critique
       const diff = target.current - posRef.current;
-      velocity.current += (k * diff - c * velocity.current) * dt;
-      posRef.current += velocity.current * dt;
-      if (Math.abs(diff) < 0.0008 && Math.abs(velocity.current) < 0.01) {
+      if (motion.current === 'follow') {
+        // Lissage très court (~25 ms) : suit le doigt sans retard perceptible
+        const move = diff * (1 - Math.exp(-dt * 40));
+        velocity.current = dt > 0 ? move / dt : 0;
+        posRef.current += move;
+      } else {
+        // Ressort critique : mouvement doux, sans rebond
+        const k = 190;
+        const c = 2 * Math.sqrt(k);
+        velocity.current += (k * diff - c * velocity.current) * dt;
+        posRef.current += velocity.current * dt;
+      }
+      apply();
+      if (Math.abs(target.current - posRef.current) < 0.0008 && Math.abs(velocity.current) < 0.02) {
         posRef.current = target.current;
         velocity.current = 0;
         apply();
+        raf.current = 0;
         return;
       }
-      apply();
       raf.current = requestAnimationFrame(step);
     };
     raf.current = requestAnimationFrame(step);
   }, [apply]);
 
+  const stopAnimation = useCallback(() => {
+    cancelAnimationFrame(raf.current);
+    raf.current = 0;
+  }, []);
+
   const goTo = useCallback(
     (i: number) => {
       const t = clamp(Math.round(i), 0, maxRef.current);
       target.current = t;
+      motion.current = 'spring';
       // Grand saut (Début / Fin, Page…) : on se place à 4 titres de la cible puis on glisse,
       // pour éviter d'afficher des dizaines de pochettes en une seconde
       const diff = t - posRef.current;
@@ -206,7 +218,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     [animate, apply],
   );
 
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  useEffect(() => stopAnimation, [stopAnimation]);
 
   // Sur ordinateur, la roue reçoit directement le focus clavier
   useEffect(() => {
@@ -228,25 +240,41 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    let lastStep = 0;
     let snapTimer = 0;
+    let gestureStart = 0;
+    const isMouseNotch = (e: WheelEvent) => {
+      if (e.deltaMode !== 0) return true; // Firefox : défilement par lignes = molette
+      const d = Math.abs(e.deltaY);
+      // Molette classique : multiples exacts de 100 (Chrome/Edge) ou 120 (Windows)
+      return d >= 100 && Number.isInteger(e.deltaY) && (d % 100 === 0 || d % 120 === 0) && Math.abs(e.deltaX) === 0;
+    };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const delta = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
-      const now = performance.now();
-      if (e.deltaMode !== 0 || (Math.abs(delta) >= 50 && Number.isInteger(e.deltaY))) {
-        // Molette de souris : un cran = un titre, avec animation douce
-        if (now - lastStep < 35) return;
-        lastStep = now;
-        goTo(Math.round(target.current) + Math.sign(delta));
+      if (isMouseNotch(e)) {
+        // Un cran = un titre (plusieurs crans rapides s'additionnent)
+        clearTimeout(snapTimer);
+        const base = motion.current === 'spring' ? target.current : Math.round(posRef.current);
+        goTo(Math.round(base) + Math.sign(e.deltaY));
         return;
       }
-      // Trackpad : la roue suit le doigt en continu, puis se cale sur le titre le plus proche
-      const g = geoRef.current;
-      target.current = clamp(target.current + delta / (g.spacing * 0.85), -0.35, maxRef.current + 0.35);
+      // Trackpad / souris à défilement fin : la roue suit le geste en continu…
+      const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (motion.current === 'spring') {
+        target.current = posRef.current;
+        gestureStart = Math.round(posRef.current);
+      }
+      motion.current = 'follow';
+      target.current = clamp(target.current + delta / geoRef.current.spacing, -0.4, maxRef.current + 0.4);
       animate();
+      // …puis se cale sur le titre le plus proche quand le geste (et son inertie) s'arrête
       clearTimeout(snapTimer);
-      snapTimer = window.setTimeout(() => goTo(target.current), 110);
+      snapTimer = window.setTimeout(() => {
+        const projected = target.current + clamp(velocity.current, -20, 20) * 0.05;
+        let dest = Math.round(projected);
+        // Petit geste volontaire (ex. souris Mac à défilement fin) : au moins un titre
+        if (dest === gestureStart && Math.abs(projected - gestureStart) > 0.06) dest += Math.sign(projected - gestureStart);
+        goTo(dest);
+      }, 90);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => {
@@ -334,7 +362,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
       if (Math.abs(dy) < 6) return;
       d.moved = true;
       clearTimeout(longPress.current);
-      cancelAnimationFrame(raf.current);
+      stopAnimation();
       velocity.current = 0;
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
@@ -344,6 +372,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
     if (p > maxRef.current) p = maxRef.current + (p - maxRef.current) / 3;
     posRef.current = p;
     target.current = p;
+    motion.current = 'follow';
     apply();
     const now = performance.now();
     d.samples.push({ t: now, p });
@@ -411,6 +440,7 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
               cover={geo.cover}
               subtitle={mode === 'album' ? `Piste ${trackNumber(tracks[i], i)} · ${formatTime(tracks[i].duration)}` : tracks[i].artist}
               focused={i === focus}
+              depth={Math.abs(i - focus)}
               register={register}
               onSelect={selectIndex}
               onPlay={playIndex}
@@ -444,13 +474,14 @@ interface ItemProps {
   cover: number;
   subtitle: string;
   focused: boolean;
+  depth: number;
   register: (i: number, el: HTMLDivElement | null) => void;
   onSelect: (i: number) => void;
   onPlay: (i: number) => void;
   onMenu: (i: number) => void;
 }
 
-const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focused, register, onSelect, onPlay, onMenu }: ItemProps) {
+const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focused, depth, register, onSelect, onPlay, onMenu }: ItemProps) {
   const isCurrent = usePlayer((s) => s.queue[s.index]?.id === track.id);
   const isPlaying = usePlayer((s) => isCurrent && s.isPlaying);
   const toggle = usePlayer((s) => s.toggle);
@@ -469,7 +500,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
       role="option"
       aria-selected={focused}
       className={`wheel-item ${focused ? 'focused' : ''} ${isCurrent ? 'current' : ''}`}
-      style={{ height: cover }}
+      style={{ height: cover, zIndex: 100 - depth * 10 }}
       onClick={() => onSelect(index)}
     >
       <span className="wheel-pill" style={{ left: cover * 0.45 }} />
