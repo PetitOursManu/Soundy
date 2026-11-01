@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { login } from '../api/emby';
+import { Brand } from '../components/Brand';
 import { IconLock, IconServer, IconUser } from '../components/Icons';
 import { useAuth } from '../store/auth';
 import { useNetwork } from '../store/network';
@@ -34,6 +35,7 @@ export default function Login() {
 
   return (
     <div className="welcome">
+      <Brand size={44} />
       <div className="discs" aria-hidden>
         <div className="half" />
         <div className="half" />

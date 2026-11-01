@@ -1,9 +1,9 @@
 // Service worker Soundy : met en cache l'application (pas la musique,
 // qui est stockée dans IndexedDB lors des téléchargements).
-const CACHE = 'soundy-shell-v1';
+const CACHE = 'soundy-shell-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './icon.svg', './manifest.webmanifest'])));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './favicon-64.png', './logo-mark.png', './manifest.webmanifest'])));
   self.skipWaiting();
 });
 

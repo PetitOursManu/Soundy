@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_VERSION } from '../api/emby';
+import { Brand } from '../components/Brand';
 import { IconBack, IconLogout, IconServer } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
@@ -174,7 +175,10 @@ export default function Settings() {
           <IconLogout /> Se déconnecter
         </button>
       </div>
-      <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30 }}>
+        <Brand size={34} />
+      </div>
+      <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 10 }}>
         Soundy v{APP_VERSION} · build du {__BUILD__}
       </p>
 
