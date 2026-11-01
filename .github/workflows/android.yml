@@ -64,11 +64,13 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.SOUNDY_KEYSTORE_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
-            # Tolère les retours à la ligne / espaces ajoutés lors du copier-coller
-            CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n')
+            # Tolère les retours à la ligne / espaces / texte ajoutés lors du copier-coller :
+            # on garde la longue suite de caractères base64 (la clé elle-même)
+            CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n' | grep -oE '[A-Za-z0-9+/]{100,}={0,2}' | head -n1 || true)
+            echo "Secret SOUNDY_KEYSTORE_BASE64 : ${#CLEAN} caractères utiles (attendu : environ 3488), début « ${CLEAN:0:3} » (attendu : « MII »)"
             PASS=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-            if ! printf '%s' "$CLEAN" | base64 -d > "$RUNNER_TEMP/soundy.jks" 2>/dev/null; then
-              echo "::error::Le secret SOUNDY_KEYSTORE_BASE64 est invalide (caractères en trop ou valeur incomplète). Recopiez la longue ligne de la fiche, en entier, sans rien d'autre."
+            if [ "${#CLEAN}" -lt 3000 ] || ! printf '%s' "$CLEAN" | base64 -d > "$RUNNER_TEMP/soundy.jks" 2>/dev/null; then
+              echo "::error::Le secret SOUNDY_KEYSTORE_BASE64 est invalide (${#CLEAN} caractères reçus au lieu d'environ 3488 : valeur coupée ou mal copiée). Recopiez le contenu du fichier keystore-base64.txt en entier."
               exit 1
             fi
             if ! keytool -list -keystore "$RUNNER_TEMP/soundy.jks" -storepass "$PASS" -alias soundy >/dev/null 2>&1; then
