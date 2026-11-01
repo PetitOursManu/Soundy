@@ -2330,8 +2330,9 @@ input[type='search']::-webkit-search-decoration {
 .brand img {
   width: var(--brand-size);
   height: var(--brand-size);
-  border-radius: 22%;
-  box-shadow: 4px 5px 12px var(--sh-dark), -3px -3px 9px var(--sh-light);
+  object-fit: contain;
+  /* « S » seul, sans bloc : juste une ombre douce qui suit sa forme */
+  filter: drop-shadow(2px 3px 4px var(--sh-dark));
 }
 
 .brand span {

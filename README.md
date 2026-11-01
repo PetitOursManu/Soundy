@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.5.1** | Logo : le « S » apparaît seul, sans bloc autour, dans l'en-tête, l'écran de connexion et les Réglages. |
 | **1.5.0** | Bras de la platine qui avance sur le vinyle au fil du titre. Barre de défilement courbe qui suit la roue des titres. Serveur : `EMBY_URL` plus tolérante (suffixe `/emby` détecté, espaces / guillemets ignorés), diagnostic `/api/health`, messages d'erreur précis. Onglet Demandes : l'adresse saisie est utilisée immédiatement. |
 | **1.4.2** | Pochettes affichées pour les albums sans image propre dans Emby (celle d'un titre). Tri par artiste fiable : albums d'un même artiste côte à côte (variantes « feat. », majuscules, accents regroupées), puis ordre alphabétique. |
 | **1.4.1** | Notifications des demandes plus simples : service reconnu automatiquement (ntfy, Discord, Gotify, Slack), bouton de test dans les Réglages (admin), guide dans le README. |
