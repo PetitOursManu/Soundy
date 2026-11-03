@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.5.4** | Android: signed APK and release published from `main` only (the signing key is no longer given to other branches); test APKs from branches are signed with a throwaway key. |
 | **1.5.3** | Android: status bar and navigation bar match the chosen theme (light / dark / automatic), with readable icons. |
 | **1.5.2** | Mobile: the curved scrollbar no longer overlaps the tracks (space reserved to the right of the wheel). |
 | **1.5.1** | Logo: the "S" now stands on its own, with no block around it, in the header, login screen and Settings. |
