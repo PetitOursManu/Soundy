@@ -1,0 +1,172 @@
+# Compile, signe et publie l'application Android, sur main seulement.
+#
+# - Chaque push sur main : APK signé, téléchargeable dans « Actions » → « Artifacts ».
+# - Si la version de package.json (ex. 1.6.0) n'a pas encore de Release, une
+#   Release GitHub « v1.6.0 » est créée avec l'APK.
+#   → Pour publier une nouvelle version : augmentez "version" dans package.json.
+#
+# Signature : pour que les mises à jour s'installent PAR-DESSUS l'ancienne version
+# (et conservent les titres téléchargés), l'APK doit toujours être signé avec la
+# même clé. Tout ce qui sert à publier est rangé dans l'environnement GitHub
+# « publication » (Settings → Environments), ouvert à la seule branche main :
+#   SOUNDY_KEYSTORE_BASE64   (contenu du fichier .jks encodé en base64)
+#   SOUNDY_KEYSTORE_PASSWORD (mot de passe de la clé)
+#   RELEASE_DEPLOY_KEY       (partie privée de la clé de déploiement en écriture
+#                             « publication (workflow) » : elle crée l'étiquette
+#                             v…, que les règles du dépôt verrouillent)
+# Une autre branche ne peut pas entrer dans cet environnement : elle n'a ni la
+# clé de signature, ni le droit d'écrire.
+name: Android APK (publication)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Deux pushes rapprochés sur main : le second attend la fin du premier.
+concurrency:
+  group: publication
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: publication
+    outputs:
+      version: ${{ steps.rel.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Compilation de l'application web
+        run: npm run build
+        env:
+          # À définir dans Settings → Secrets and variables → Actions → Variables
+          VITE_EMBY_URL: ${{ vars.SOUNDY_EMBY_URL }}
+          VITE_REQUESTS_URL: ${{ vars.SOUNDY_REQUESTS_URL }}
+
+      - name: Synchronisation Capacitor
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Clé de signature
+        env:
+          KEYSTORE_B64: ${{ secrets.SOUNDY_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SOUNDY_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Secrets SOUNDY_KEYSTORE_BASE64 / SOUNDY_KEYSTORE_PASSWORD absents de l'environnement « publication » (Settings → Environments → publication)."
+            exit 1
+          fi
+          # Tolère les retours à la ligne / espaces / texte ajoutés lors du copier-coller :
+          # on garde la longue suite de caractères base64 (la clé elle-même)
+          CLEAN=$(printf '%s' "$KEYSTORE_B64" | tr -d ' \t\r\n' | grep -oE '[A-Za-z0-9+/]{100,}={0,2}' | head -n1 || true)
+          echo "Secret SOUNDY_KEYSTORE_BASE64 : ${#CLEAN} caractères utiles (attendu : environ 3488), début « ${CLEAN:0:3} » (attendu : « MII »)"
+          PASS=$(printf '%s' "$KEYSTORE_PASSWORD" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          if [ "${#CLEAN}" -lt 3000 ] || ! printf '%s' "$CLEAN" | base64 -d > "$RUNNER_TEMP/soundy.jks" 2>/dev/null; then
+            echo "::error::Le secret SOUNDY_KEYSTORE_BASE64 est invalide (${#CLEAN} caractères reçus au lieu d'environ 3488 : valeur coupée ou mal copiée). Recopiez le contenu du fichier keystore-base64.txt en entier."
+            exit 1
+          fi
+          if ! keytool -list -keystore "$RUNNER_TEMP/soundy.jks" -storepass "$PASS" -alias soundy >/dev/null 2>&1; then
+            echo "::error::La clé n'a pas pu être ouverte : vérifiez le secret SOUNDY_KEYSTORE_PASSWORD (mot de passe de la fiche, sans espace)."
+            exit 1
+          fi
+          echo "SOUNDY_KEYSTORE_FILE=$RUNNER_TEMP/soundy.jks" >> "$GITHUB_ENV"
+          echo "SOUNDY_KEYSTORE_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          echo "✅ APK signé avec la clé Soundy"
+
+      - name: Compilation de l'APK signé
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk ../soundy.apk
+
+      - name: Version
+        id: rel
+        run: |
+          V="v$(node -p "require('./package.json').version")"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          cp soundy.apk "Soundy-$V.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: soundy-apk
+          path: Soundy-${{ steps.rel.outputs.version }}.apk
+          if-no-files-found: error
+
+  # Ne compile rien : reprend l'APK du travail précédent et publie la Release.
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: publication
+    permissions:
+      contents: write # créer la Release (l'étiquette, elle, est poussée avec la clé dédiée)
+    env:
+      V: ${{ needs.build.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Release déjà publiée ?
+        id: check
+        run: |
+          if gh release view "$V" >/dev/null 2>&1; then
+            echo "La Release $V existe déjà, rien à publier."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.publish == 'true'
+        with:
+          ssh-key: ${{ secrets.RELEASE_DEPLOY_KEY }}
+
+      - name: Étiquette (clé dédiée)
+        if: steps.check.outputs.publish == 'true'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$V" >/dev/null; then
+            echo "L'étiquette $V existe déjà : la Release s'y rattache."
+          else
+            git tag "$V" "$GITHUB_SHA"
+            git push origin "refs/tags/$V"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.check.outputs.publish == 'true'
+        with:
+          name: soundy-apk
+
+      - name: Publication de la Release GitHub
+        if: steps.check.outputs.publish == 'true'
+        run: |
+          cat > notes.md <<EOF
+          ## 📱 Installer Soundy sur Android
+          1. Téléchargez **Soundy-${V}.apk** ci-dessous depuis votre téléphone.
+          2. Ouvrez le fichier et autorisez l'installation depuis cette source si Android le demande.
+          3. Connectez-vous avec votre compte Emby, puis indiquez l'adresse de votre serveur Soundy
+             dans *Réglages → Serveur de demandes* (pour l'onglet Demandes).
+
+          🔄 **Mise à jour** : installez simplement le nouvel APK par-dessus l'ancien,
+          vos titres téléchargés et votre connexion sont conservés.
+          EOF
+          gh release create "$V" "Soundy-$V.apk" --verify-tag --latest \
+            --title "Soundy $V" --notes-file notes.md

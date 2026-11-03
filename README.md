@@ -281,13 +281,19 @@ Ouvrez la page **Releases** du dépôt et téléchargez `Soundy-vX.Y.Z.apk` depu
 Une nouvelle Release est publiée automatiquement à chaque nouvelle version arrivée sur `main` :
 il suffit d'augmenter `"version"` dans `package.json` (ex. `1.2.0` → `1.3.0`).
 
-### Option 1 bis — APK de test (chaque push)
+### Option 1 bis — APK de test (chaque push sur une branche)
 
-Le workflow GitHub Actions `.github/workflows/android.yml` compile l'APK à chaque push :
+Le workflow GitHub Actions `.github/workflows/android.yml` compile un APK de test à chaque push
+sur une branche autre que `main` :
 
-1. Sur GitHub, ouvrez l'onglet **Actions** → workflow **Android APK** → dernière exécution.
-2. Téléchargez l'artefact **soundy-apk** (fichier zip contenant `app-debug.apk`).
+1. Sur GitHub, ouvrez l'onglet **Actions** → workflow **Android APK (vérification)** → dernière exécution.
+2. Téléchargez l'artefact **soundy-apk** (fichier zip contenant l'APK).
 3. Copiez l'APK sur le téléphone et installez-le (autorisez « sources inconnues »).
+
+Ce workflow tourne sur du code pas encore relu : il ne reçoit **aucun secret** et ne peut rien écrire.
+L'APK de test est donc signé avec une clé jetable et **ne s'installe pas par-dessus** l'application
+officielle (désinstallez-la d'abord). Sur `main`, c'est le workflow **Android APK (publication)**
+(`.github/workflows/release.yml`) qui compile l'APK signé et publie la Release.
 
 > 💡 Dans *Settings → Secrets and variables → Actions → Variables*, vous pouvez définir
 > `SOUNDY_EMBY_URL` (adresse Emby pré-remplie) et `SOUNDY_REQUESTS_URL`
@@ -296,17 +302,34 @@ Le workflow GitHub Actions `.github/workflows/android.yml` compile l'APK à chaq
 ### Signature de l'APK (mises à jour sans perte des téléchargements)
 
 Pour qu'une mise à jour s'installe **par-dessus** l'ancienne version (et conserve les titres
-téléchargés), chaque APK doit être signé avec la **même clé**. Elle est fournie au workflow
-par deux secrets du dépôt (*Settings → Secrets and variables → Actions → New repository secret*) :
+téléchargés), chaque APK doit être signé avec la **même clé**. Elle n'est fournie qu'au workflow
+de publication, sur `main`, par l'**environnement** GitHub `publication` (*Settings → Environments →
+publication*), dont les déploiements sont limités à la branche `main` (*Deployment branches and tags →
+Selected branches and tags* → `main`). Ne la rangez **pas** dans les secrets du dépôt
+(*Secrets and variables → Actions*) : n'importe quelle branche pourrait les lire.
 
-| Secret | Contenu |
+| Secret de l'environnement `publication` | Contenu |
 |---|---|
 | `SOUNDY_KEYSTORE_BASE64` | Le fichier de clé `.jks` encodé en base64 (une seule ligne) |
 | `SOUNDY_KEYSTORE_PASSWORD` | Le mot de passe de la clé (alias `soundy`) |
+| `RELEASE_DEPLOY_KEY` | La partie privée de la clé de déploiement « publication (workflow) » (voir plus bas) |
 
-Sans ces secrets, l'APK est compilé avec une clé temporaire et **aucune Release n'est publiée**.
+Sans ces secrets, la publication échoue avec un message qui dit lequel manque.
 ⚠️ Ne publiez jamais la clé ni son mot de passe (le dépôt est public) et gardez-en une copie :
 si elle est perdue, la mise à jour suivante obligera à désinstaller l'appli une fois.
+
+**Étiquettes verrouillées.** Les étiquettes `v…` des Releases peuvent être verrouillées par une règle
+du dépôt (*Settings → Rules*). Le workflow les crée donc avec une **clé de déploiement** dédiée, en
+écriture : sa partie publique est dans *Settings → Deploy keys* (« publication (workflow) », seule clé
+du dépôt), sa partie privée dans le secret `RELEASE_DEPLOY_KEY`, et « Deploy keys » figure dans les
+exceptions de la règle. Pour la (re)créer :
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "soundy publication" -f soundy-publication
+```
+
+`soundy-publication.pub` va dans *Deploy keys* (case « Allow write access » cochée),
+`soundy-publication` dans le secret `RELEASE_DEPLOY_KEY` ; effacez ensuite les deux fichiers.
 
 Créer une nouvelle clé (si besoin) :
 

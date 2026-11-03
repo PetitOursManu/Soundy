@@ -281,13 +281,19 @@ Open the repository **Releases** page and download `Soundy-vX.Y.Z.apk` from your
 A new release is published automatically for each new version merged into `main`:
 just bump `"version"` in `package.json` (e.g. `1.2.0` → `1.3.0`).
 
-### Option 1b — Test APK (every push)
+### Option 1b — Test APK (every push to a branch)
 
-The GitHub Actions workflow `.github/workflows/android.yml` builds the APK on every push:
+The GitHub Actions workflow `.github/workflows/android.yml` builds a test APK on every push to a
+branch other than `main`:
 
-1. On GitHub, open the **Actions** tab → **Android APK** workflow → latest run.
+1. On GitHub, open the **Actions** tab → **Android APK (vérification)** workflow → latest run.
 2. Download the **soundy-apk** artifact (zip file containing the APK).
 3. Copy the APK to the phone and install it (allow "unknown sources").
+
+This workflow runs on code that has not been reviewed yet: it gets **no secrets** and cannot write
+anything. The test APK is therefore signed with a throwaway key and **does not install over** the
+official app (uninstall it first). On `main`, the **Android APK (publication)** workflow
+(`.github/workflows/release.yml`) builds the signed APK and publishes the release.
 
 > 💡 In *Settings → Secrets and variables → Actions → Variables*, you can set
 > `SOUNDY_EMBY_URL` (pre-filled Emby address) and `SOUNDY_REQUESTS_URL`
@@ -296,17 +302,33 @@ The GitHub Actions workflow `.github/workflows/android.yml` builds the APK on ev
 ### APK signing (updates without losing downloads)
 
 For an update to install **over** the previous version (and keep downloaded tracks), every APK
-must be signed with the **same key**. It is provided to the workflow by two repository secrets
-(*Settings → Secrets and variables → Actions → New repository secret*):
+must be signed with the **same key**. It is only given to the publishing workflow, on `main`, by the
+GitHub **environment** `publication` (*Settings → Environments → publication*), whose deployments are
+limited to the `main` branch (*Deployment branches and tags → Selected branches and tags* → `main`).
+Do **not** store it in the repository secrets (*Secrets and variables → Actions*): any branch could
+read them.
 
-| Secret | Content |
+| Secret of the `publication` environment | Content |
 |---|---|
 | `SOUNDY_KEYSTORE_BASE64` | The `.jks` key file encoded in base64 (a single line) |
 | `SOUNDY_KEYSTORE_PASSWORD` | The key password (alias `soundy`) |
+| `RELEASE_DEPLOY_KEY` | The private part of the "publication (workflow)" deploy key (see below) |
 
-Without these secrets, the APK is built with a temporary key and **no release is published**.
+Without these secrets, publishing fails with a message saying which one is missing.
 ⚠️ Never publish the key or its password (the repository is public) and keep a copy:
 if it is lost, the next update will require uninstalling the app once.
+
+**Locked tags.** The `v…` release tags may be locked by a repository rule (*Settings → Rules*). The
+workflow therefore creates them with a dedicated **deploy key** with write access: its public part is
+in *Settings → Deploy keys* ("publication (workflow)", the repository's only key), its private part in
+the `RELEASE_DEPLOY_KEY` secret, and "Deploy keys" is in the rule's bypass list. To (re)create it:
+
+```bash
+ssh-keygen -t ed25519 -N "" -C "soundy publication" -f soundy-publication
+```
+
+`soundy-publication.pub` goes into *Deploy keys* ("Allow write access" checked),
+`soundy-publication` into the `RELEASE_DEPLOY_KEY` secret; then delete both files.
 
 Create a new key (if needed):
 
