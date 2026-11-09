@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.5.5** | Navigation bar: download count badge next to the Library icon, both centred. Track wheel: Play and ❤ buttons removed (tap the centred track to play it), translucent ❤ in the centre of each track's cover (pink when favourited). |
 | **1.5.4** | Android: signed APK and release published from `main` only (the signing key is no longer given to other branches); test APKs from branches are signed with a throwaway key. |
 | **1.5.3** | Android: status bar and navigation bar match the chosen theme (light / dark / automatic), with readable icons. |
 | **1.5.2** | Mobile: the curved scrollbar no longer overlaps the tracks (space reserved to the right of the wheel). |

@@ -18,9 +18,11 @@ export function BottomNav() {
       <nav aria-label={t('nav.main')}>
         {items.map((it) => (
           <NavLink key={it.to} to={it.to} end={it.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-            {it.icon}
+            <span className="nav-ico">
+              {it.icon}
+              {!!it.badge && <span className="dot">{it.badge}</span>}
+            </span>
             <span>{it.label}</span>
-            {!!it.badge && <span className="dot">{it.badge}</span>}
           </NavLink>
         ))}
       </nav>

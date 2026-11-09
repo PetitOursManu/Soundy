@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.5.5** | Barre de navigation : pastille des téléchargements à côté de l'icône Bibliothèque, l'ensemble centré. Roue des titres : boutons Lire et ❤ retirés (un appui sur le titre centré le lance), ❤ translucide posé au centre de la jaquette de chaque titre (rose en favori). |
 | **1.5.4** | Android : APK signé et Release publiés seulement depuis `main` (la clé de signature n'est plus fournie aux autres branches) ; APK de test des branches signés avec une clé jetable. |
 | **1.5.3** | Android : barre d'état et barre de navigation de la couleur du thème choisi (clair / sombre / automatique), icônes lisibles. |
 | **1.5.2** | Mobile : la barre de défilement courbe ne passe plus sur les titres (place réservée à droite de la roue). |
