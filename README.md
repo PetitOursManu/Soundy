@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.5.7** | Liste des titres : même hauteur avec ou sans mini lecteur (il passe par-dessus). Lecteur : tout tient sans défiler ; ❤ au centre du vinyle, « Sortie audio » dans le menu ⋯, téléchargement et file d'attente de part et d'autre de la source. |
 | **1.5.6** | Mini lecteur : quand le titre est en pause, un glissement du doigt vers le bas le fait disparaître (la lecture est arrêtée). |
 | **1.5.5** | Barre de navigation : pastille des téléchargements à côté de l'icône Bibliothèque, l'ensemble centré. Roue des titres : boutons Lire et ❤ retirés (un appui sur le titre centré le lance), ❤ translucide posé au centre de la jaquette de chaque titre (rose en favori). |
 | **1.5.4** | Android : APK signé et Release publiés seulement depuis `main` (la clé de signature n'est plus fournie aux autres branches) ; APK de test des branches signés avec une clé jetable. |

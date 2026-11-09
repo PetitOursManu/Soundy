@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Track } from '../api/emby';
 import { formatTime } from '../lib/format';
@@ -102,7 +102,7 @@ export const TrackRow = memo(function TrackRow({ track, number, showCover = true
   );
 });
 
-export function TrackMenu({ track, onClose }: { track: Track; onClose: () => void }) {
+export function TrackMenu({ track, onClose, extra }: { track: Track; onClose: () => void; extra?: ReactNode }) {
   const navigate = useNavigate();
   const { addNext, addToQueue } = usePlayer.getState();
   const downloaded = useDownloads((s) => !!s.downloaded[track.id]);
@@ -119,6 +119,7 @@ export function TrackMenu({ track, onClose }: { track: Track; onClose: () => voi
 
   return (
     <Sheet open onClose={onClose} title={track.title} description={`${track.artist}${track.album ? ` · ${track.album}` : ''}`}>
+      {extra}
       <MenuItem
         icon={fav ? <IconHeartFilled style={{ color: '#f0507a' }} /> : <IconHeart />}
         label={fav ? t('fav.remove') : t('fav.add')}

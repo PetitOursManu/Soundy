@@ -1139,7 +1139,7 @@ input[type='search']::-webkit-search-decoration {
 /* Platine vinyle */
 .turntable {
   position: relative;
-  width: min(78vw, 340px, 38dvh);
+  width: min(78vw, 340px, 35dvh);
   aspect-ratio: 1;
   margin: clamp(14px, 4vh, 44px) 0 clamp(16px, 3.5vh, 36px);
   border-radius: 50%;
@@ -1253,11 +1253,51 @@ input[type='search']::-webkit-search-decoration {
   max-width: 100%;
 }
 
+.player-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+/* ❤ au centre du vinyle : translucide par défaut, rose en favori */
+.vinyl-fav {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 24%;
+  height: 24%;
+  z-index: 2;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(20, 22, 30, 0.22);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  opacity: 0.8;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
+}
+
+.vinyl-fav svg {
+  width: 46%;
+  height: 46%;
+}
+
+.vinyl-fav.on {
+  opacity: 1;
+  color: #f0507a;
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(240, 80, 122, 0.45);
+}
+
 .source-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
   height: 26px;
   padding: 0 12px;
   border-radius: 999px;
@@ -1411,42 +1451,6 @@ input[type='search']::-webkit-search-decoration {
 .controls .skip svg {
   width: 22px;
   height: 22px;
-}
-
-.player-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-top: clamp(18px, 4vh, 34px);
-  gap: 10px;
-}
-
-.output-btn {
-  flex: 1;
-  height: 46px;
-  min-width: 0;
-  border-radius: 999px;
-  padding: 0 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-2);
-  background: var(--bg);
-  box-shadow: var(--neu-sm);
-}
-
-.output-btn svg {
-  width: 18px;
-  height: 18px;
-  flex: none;
-}
-
-.output-btn.connected {
-  color: var(--accent);
 }
 
 .loader {
@@ -2003,8 +2007,10 @@ input[type='search']::-webkit-search-decoration {
   padding-bottom: calc(var(--nav-h) + var(--safe-bottom) + 22px);
 }
 
-.has-mini .page-fill {
-  padding-bottom: calc(var(--nav-h) + var(--mini-h) + var(--safe-bottom) + 34px);
+/* Avec le mini lecteur, la roue garde sa hauteur : il passe par-dessus les derniers
+   titres (pas de saut quand il apparaît / disparaît). Seul le compteur remonte. */
+.has-mini .page-fill .wheel-counter {
+  bottom: calc(var(--mini-h) + 12px);
 }
 
 .wheel-area {

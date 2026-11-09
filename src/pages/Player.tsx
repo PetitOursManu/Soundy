@@ -21,6 +21,7 @@ import {
 import { OutputSheet, useOutputLabel } from '../components/OutputSheet';
 import { ProgressRing } from '../components/ProgressRing';
 import { QueueSheet } from '../components/QueueSheet';
+import { MenuItem } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { TrackMenu } from '../components/TrackRow';
 import { useT } from '../i18n';
@@ -47,7 +48,7 @@ export default function Player() {
   const { t } = useT();
   const [preview, setPreview] = useState<number | null>(null);
   const [sheet, setSheet] = useState<'output' | 'queue' | 'menu' | null>(null);
-  const output = useOutputLabel(sheet === 'output');
+  const output = useOutputLabel(sheet === 'menu');
 
   const close = () => (window.history.length > 1 ? navigate(-1) : navigate('/'));
 
@@ -99,6 +100,8 @@ export default function Player() {
             <Cover imageId={track.imageId} tag={track.imageTag} size={600} alt={track.album} />
             <span className="hole" />
           </div>
+          {/* ❤ au centre du vinyle (ne tourne pas avec le disque) */}
+          <FavoriteButton item={track} className="vinyl-fav" />
           {/* Bras de lecture : posé sur le bord extérieur au début du titre, il avance
               vers le centre au fil de la lecture (comme une vraie platine) */}
           <div
@@ -116,17 +119,31 @@ export default function Player() {
           {track.artist}
           {track.album ? ` · ${track.album}` : ''}
         </div>
-        <span className={`source-badge ${source === 'local' ? 'local' : ''}`}>
-          {source === 'local' ? (
-            <>
-              <IconDownloaded /> {t('player.local')}
-            </>
-          ) : (
-            <>
-              <IconCloud /> {t('player.streaming')}
-            </>
-          )}
-        </span>
+        {/* Téléchargement · source · file d’attente */}
+        <div className="player-meta">
+          <button
+            className="icon-btn sm"
+            aria-label={downloaded ? t('common.downloaded') : t('player.download')}
+            disabled={!downloaded && !task && !online}
+            onClick={() => (downloaded || task ? setSheet('menu') : useDownloads.getState().download([track]))}
+          >
+            {task ? <ProgressRing value={task.progress} /> : downloaded ? <IconDownloaded style={{ color: 'var(--success)' }} /> : <IconDownload />}
+          </button>
+          <span className={`source-badge ${source === 'local' ? 'local' : ''}`}>
+            {source === 'local' ? (
+              <>
+                <IconDownloaded /> {t('player.local')}
+              </>
+            ) : (
+              <>
+                <IconCloud /> {t('player.streaming')}
+              </>
+            )}
+          </span>
+          <button className="icon-btn sm" onClick={() => setSheet('queue')} aria-label={t('player.queue')}>
+            <IconQueue />
+          </button>
+        </div>
 
         <div className={`bars ${isPlaying && !buffering ? 'on' : ''}`} aria-hidden>
           {[0.1, 0.5, 0.25, 0.8, 0.4, 0.65, 0.15, 0.9, 0.35].map((d, i) => (
@@ -163,30 +180,24 @@ export default function Player() {
             <RepeatIcon />
           </button>
         </div>
-
-        <div className="player-actions">
-          <FavoriteButton item={track} />
-          <button
-            className="icon-btn"
-            aria-label={downloaded ? t('common.downloaded') : t('player.download')}
-            disabled={!downloaded && !task && !online}
-            onClick={() => (downloaded || task ? setSheet('menu') : useDownloads.getState().download([track]))}
-          >
-            {task ? <ProgressRing value={task.progress} /> : downloaded ? <IconDownloaded style={{ color: 'var(--success)' }} /> : <IconDownload />}
-          </button>
-          <button className={`output-btn ${output.label ? 'connected' : ''}`} onClick={() => setSheet('output')}>
-            {output.bluetooth ? <IconBluetooth /> : <IconSpeaker />}
-            <span className="ellipsis">{output.label ?? t('player.output')}</span>
-          </button>
-          <button className="icon-btn" onClick={() => setSheet('queue')} aria-label={t('player.queue')}>
-            <IconQueue />
-          </button>
-        </div>
       </div>
 
       <OutputSheet open={sheet === 'output'} onClose={() => setSheet(null)} />
       <QueueSheet open={sheet === 'queue'} onClose={() => setSheet(null)} />
-      {sheet === 'menu' && <TrackMenu track={track} onClose={() => setSheet(null)} />}
+      {sheet === 'menu' && (
+        <TrackMenu
+          track={track}
+          onClose={() => setSheet(null)}
+          extra={
+            <MenuItem
+              icon={output.bluetooth ? <IconBluetooth /> : <IconSpeaker />}
+              label={t('player.output')}
+              hint={output.label ?? undefined}
+              onClick={() => setSheet('output')}
+            />
+          }
+        />
+      )}
     </div>
   );
 }

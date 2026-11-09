@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.5.7** | Track list: same height with or without the mini player (it now overlays the list). Player: everything fits without scrolling; ❤ in the centre of the record, “Audio output” in the ⋯ menu, download and queue on either side of the source badge. |
 | **1.5.6** | Mini player: when the track is paused, swipe it down to dismiss it (playback is stopped). |
 | **1.5.5** | Navigation bar: download count badge next to the Library icon, both centred. Track wheel: Play and ❤ buttons removed (tap the centred track to play it), translucent ❤ in the centre of each track's cover (pink when favourited). |
 | **1.5.4** | Android: signed APK and release published from `main` only (the signing key is no longer given to other branches); test APKs from branches are signed with a throwaway key. |
