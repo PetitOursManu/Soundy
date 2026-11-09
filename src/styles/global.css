@@ -1011,6 +1011,11 @@ input[type='search']::-webkit-search-decoration {
   animation: mini-in 0.5s var(--ease);
 }
 
+/* En pause : on peut le faire glisser vers le bas pour le fermer */
+.mini-player.dismissable {
+  touch-action: none;
+}
+
 @keyframes mini-in {
   from {
     transform: translate(-50%, 30px);
