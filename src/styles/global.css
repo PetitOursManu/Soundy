@@ -968,14 +968,19 @@ input[type='search']::-webkit-search-decoration {
   box-shadow: var(--neu-in-sm);
 }
 
+.bottom-nav .nav-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Pastille du nombre de téléchargements : à côté de l'icône, l'ensemble reste centré */
 .bottom-nav .dot {
-  position: absolute;
-  top: 8px;
-  right: calc(50% - 18px);
-  min-width: 17px;
-  height: 17px;
+  min-width: 18px;
+  height: 18px;
   border-radius: 999px;
-  padding: 0 4px;
+  padding: 0 5px;
   font-size: 10px;
   display: grid;
   place-items: center;
@@ -2171,7 +2176,42 @@ input[type='search']::-webkit-search-decoration {
 }
 
 .wheel-item.focused .wheel-text {
-  padding-right: 146px; /* place pour ❤ + bouton Lire */
+  padding-right: 48px; /* place pour le bouton ⋯ (ordinateur) */
+}
+
+@media (hover: none) {
+  .wheel-item.focused .wheel-text {
+    padding-right: 8px;
+  }
+}
+
+/* ❤ posé sur la jaquette : translucide par défaut, rouge plein en favori */
+.wheel-fav {
+  position: absolute;
+  right: 2%;
+  bottom: 2%;
+  width: clamp(26px, 30%, 34px);
+  height: clamp(26px, 30%, 34px);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(20, 22, 30, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  opacity: 0.75;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.wheel-fav svg {
+  width: 52%;
+  height: 52%;
+}
+
+.wheel-fav.on {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .wheel-item:not(.focused) .wheel-actions {
@@ -2205,15 +2245,6 @@ input[type='search']::-webkit-search-decoration {
   .wheel-more {
     display: none;
   }
-}
-
-.wheel-actions .play-pill {
-  height: 42px;
-  min-width: 76px;
-  padding: 0 20px;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 800;
 }
 
 .play-pill {
@@ -2306,10 +2337,6 @@ input[type='search']::-webkit-search-decoration {
 @media (max-width: 400px) {
   .wheel-item {
     gap: 14px;
-  }
-  .wheel-actions .play-pill {
-    min-width: 64px;
-    padding: 0 14px;
   }
 }
 

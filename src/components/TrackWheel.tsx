@@ -1,6 +1,6 @@
 // Navigation « en roue » : les titres sont posés sur un grand cercle dont le
 // centre est à droite de l'écran. Le titre au point le plus à gauche est mis
-// en avant (pastille + bouton Lire) ; les autres s'inclinent en suivant le
+// en avant (pastille) ; un appui dessus lance la lecture ; les autres s'inclinent en suivant le
 // cercle, comme sur une molette.
 //
 // Performance : pendant l'animation, React n'est PAS sollicité. Les positions
@@ -13,16 +13,15 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Track } from '../api/emby';
 import { formatTime } from '../lib/format';
-import { hapticClick, hapticHeavy, hapticTick } from '../lib/haptics';
+import { hapticHeavy, hapticTick } from '../lib/haptics';
 import { useDownloads } from '../store/downloads';
 import { useNetwork } from '../store/network';
 import { usePlayer } from '../store/player';
 import { Cover } from './Cover';
-import { IconDownloaded, IconHeartFilled, IconMore, IconPause } from './Icons';
+import { IconDownloaded, IconMore } from './Icons';
 import { ProgressRing } from './ProgressRing';
 import { TrackMenu } from './TrackRow';
 import { useT } from '../i18n';
-import { useIsFavorite } from '../store/favorites';
 import { FavoriteButton } from './FavoriteButton';
 
 interface Props {
@@ -423,7 +422,6 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
 
   // Gestionnaires stables (évite de redessiner tous les titres)
   const selectIndex = useCallback((i: number) => (i === focusRef.current ? onPlayRef.current(i) : goTo(i)), [goTo]);
-  const playIndex = useCallback((i: number) => onPlayRef.current(i), []);
   const menuIndex = useCallback((i: number) => setMenu(tracksRef.current[i]), []);
 
   const from = Math.max(0, focus - VISIBLE);
@@ -472,7 +470,6 @@ export function TrackWheel({ tracks, mode, onPlay, onNearEnd, total, storageKey,
               depth={Math.abs(i - focus)}
               register={register}
               onSelect={selectIndex}
-              onPlay={playIndex}
               onMenu={menuIndex}
             />
           ))}
@@ -515,16 +512,12 @@ interface ItemProps {
   depth: number;
   register: (i: number, el: HTMLDivElement | null) => void;
   onSelect: (i: number) => void;
-  onPlay: (i: number) => void;
   onMenu: (i: number) => void;
 }
 
-const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focused, depth, register, onSelect, onPlay, onMenu }: ItemProps) {
+const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focused, depth, register, onSelect, onMenu }: ItemProps) {
   const isCurrent = usePlayer((s) => s.queue[s.index]?.id === track.id);
-  const isPlaying = usePlayer((s) => isCurrent && s.isPlaying);
-  const toggle = usePlayer((s) => s.toggle);
   const { t } = useT();
-  const isFav = useIsFavorite(track);
   const downloaded = useDownloads((s) => !!s.downloaded[track.id]);
   const progress = useDownloads((s) => s.tasks.find((t) => t.track.id === track.id)?.progress);
   const online = useNetwork((s) => s.online);
@@ -546,12 +539,13 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
       <span className="wheel-pill" style={{ left: cover * 0.45 }} />
       <span className="wheel-disc">
         <Cover imageId={track.imageId} tag={track.imageTag} size={240} style={{ width: '100%', height: '100%' }} alt="" />
+        {/* ❤ posé sur la jaquette (translucide tant que le titre n'est pas en favori) */}
+        <FavoriteButton item={track} className="wheel-fav" />
       </span>
       <span className="wheel-text">
         <span className="wt ellipsis">{track.title}</span>
         <span className="ws">
           {progress !== undefined ? <ProgressRing value={progress} size={13} /> : downloaded && <IconDownloaded aria-label={t('common.downloaded')} />}
-          {isFav && <IconHeartFilled className="fav-mark" aria-label={t('fav.filter')} />}
           <span className="ellipsis">{subtitle}</span>
         </span>
       </span>
@@ -566,27 +560,6 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
           }}
         >
           <IconMore />
-        </button>
-        <FavoriteButton item={track} className="icon-btn sm flat" />
-        <button
-          className={`play-pill ${isCurrent ? 'on' : ''}`}
-          aria-label={isPlaying ? t('common.pause') : t('common.play')}
-          tabIndex={focused ? 0 : -1}
-          disabled={unavailable}
-          onClick={(e) => {
-            e.stopPropagation();
-            hapticClick();
-            if (isCurrent) toggle();
-            else onPlay(index);
-          }}
-        >
-          {isPlaying ? (
-            <>
-              <IconPause /> <span className="lbl">{t('common.pause')}</span>
-            </>
-          ) : (
-            <span className="lbl">{t('common.play')}</span>
-          )}
         </button>
       </span>
     </div>
