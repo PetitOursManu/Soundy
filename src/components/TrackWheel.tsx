@@ -539,7 +539,7 @@ const WheelItem = memo(function WheelItem({ index, track, cover, subtitle, focus
       <span className="wheel-pill" style={{ left: cover * 0.45 }} />
       <span className="wheel-disc">
         <Cover imageId={track.imageId} tag={track.imageTag} size={240} style={{ width: '100%', height: '100%' }} alt="" />
-        {/* ❤ posé sur la jaquette (translucide tant que le titre n'est pas en favori) */}
+        {/* ❤ au centre de la jaquette (translucide, rose en favori) */}
         <FavoriteButton item={track} className="wheel-fav" />
       </span>
       <span className="wheel-text">

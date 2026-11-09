@@ -2185,33 +2185,38 @@ input[type='search']::-webkit-search-decoration {
   }
 }
 
-/* ❤ posé sur la jaquette : translucide par défaut, rouge plein en favori */
+/* ❤ posé au centre de la jaquette : translucide par défaut, rose en favori */
 .wheel-fav {
   position: absolute;
-  right: 2%;
-  bottom: 2%;
-  width: clamp(26px, 30%, 34px);
-  height: clamp(26px, 30%, 34px);
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 46%;
+  height: 46%;
+  min-width: 40px;
+  min-height: 40px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #fff;
-  background: rgba(20, 22, 30, 0.28);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  opacity: 0.75;
-  transition: opacity 0.2s, background 0.2s;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(20, 22, 30, 0.22);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  opacity: 0.7;
+  transition: opacity 0.2s, color 0.2s, background 0.2s;
 }
 
 .wheel-fav svg {
-  width: 52%;
-  height: 52%;
+  width: 50%;
+  height: 50%;
 }
 
 .wheel-fav.on {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.85);
+  color: #f0507a;
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(240, 80, 122, 0.45);
 }
 
 .wheel-item:not(.focused) .wheel-actions {
