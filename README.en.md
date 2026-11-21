@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.6.0** | **Kosmy Board**: “Sign in with Kosmy Board” (web version) once your account is linked in the Settings, and Soundy administration (requests, notifications, linked accounts) from the Board. |
 | **1.5.7** | Track list: same height with or without the mini player (it now overlays the list). Player: everything fits without scrolling; ❤ in the centre of the record, “Audio output” in the ⋯ menu, download and queue on either side of the source badge. |
 | **1.5.6** | Mini player: when the track is paused, swipe it down to dismiss it (playback is stopped). |
 | **1.5.5** | Navigation bar: download count badge next to the Library icon, both centred. Track wheel: Play and ❤ buttons removed (tap the centred track to play it), translucent ❤ in the centre of each track's cover (pink when favourited). |
@@ -221,6 +222,41 @@ npm install
 npm run build
 EMBY_URL=http://localhost:8096 node server/index.js
 ```
+
+---
+
+<a id="kosmy-board"></a>
+
+## 🧩 Kosmy Board
+
+Soundy can be opened from [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) without typing a password again,
+and an Emby administrator can manage it **from the Board** (requests, notifications, linked accounts).
+Web version only (not the Android app).
+
+**1. Set up sign-in** (once, by an Emby administrator):
+
+1. In Kosmy Board, add the Soundy space, then open **Single sign-on** and enable it with:
+
+   | Board field | Value |
+   |---|---|
+   | Redirect URI | `https://soundy.mydomain.com/auth/kosmy-board/callback` |
+   | Initiate login URI | `https://soundy.mydomain.com/auth/kosmy-board/login` |
+
+2. In Soundy, **Settings → Kosmy Board → Sign-in with Kosmy Board**: paste the issuer, client ID and secret given by the Board,
+   then **Save**. Both addresses above are shown there too, ready to copy.
+
+**2. Link your account** (each user, once): signed in with Emby, **Settings → Kosmy Board → Link to Kosmy Board**,
+then confirm your Emby password. From then on, **Open** in the Board signs you in to Soundy directly.
+
+- Soundy's accounts are Emby's, and Emby only opens a session with the password. When linking, the Soundy server
+  therefore opens a **dedicated Emby session** (device “Soundy · Kosmy Board”) and keeps it with the Board account.
+  **The password is never kept.**
+- **Unlink** (in the Settings, or from the Board's admin for another account) closes that session in Emby.
+  Closing it in Emby (*Dashboard → Devices*) also breaks the link: just link again.
+- Signing out of Soundy after a Board sign-in does not close the dedicated session: the link stays active.
+- **Admin in the Board**: only for linked accounts that are **Emby administrators** (checked with Emby every time).
+- Settings and linked accounts: `DATA_DIR/kosmy-board.json` (mode 600). The client secret is never sent back to the app.
+- The Soundy server must reach the Board (discovery and keys), and the Board's server must reach Soundy.
 
 ---
 

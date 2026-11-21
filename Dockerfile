@@ -18,6 +18,8 @@ ENV NODE_ENV=production \
 COPY server/package.json ./server/
 RUN cd server && npm install --omit=dev --no-audit --no-fund
 COPY server ./server
+# Version de Soundy, affichée dans l'admin de Kosmy Board
+COPY package.json ./
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown -R node:node /data
 USER node

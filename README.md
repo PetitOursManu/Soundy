@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.6.0** | **Kosmy Board** : « Se connecter avec Kosmy Board » (version web) après avoir relié son compte dans les Réglages, et administration de Soundy (demandes, notifications, comptes reliés) depuis le Board. |
 | **1.5.7** | Liste des titres : même hauteur avec ou sans mini lecteur (il passe par-dessus). Lecteur : tout tient sans défiler ; ❤ au centre du vinyle, « Sortie audio » dans le menu ⋯, téléchargement et file d'attente de part et d'autre de la source. |
 | **1.5.6** | Mini lecteur : quand le titre est en pause, un glissement du doigt vers le bas le fait disparaître (la lecture est arrêtée). |
 | **1.5.5** | Barre de navigation : pastille des téléchargements à côté de l'icône Bibliothèque, l'ensemble centré. Roue des titres : boutons Lire et ❤ retirés (un appui sur le titre centré le lance), ❤ translucide posé au centre de la jaquette de chaque titre (rose en favori). |
@@ -221,6 +222,41 @@ npm install
 npm run build
 EMBY_URL=http://localhost:8096 node server/index.js
 ```
+
+---
+
+<a id="kosmy-board"></a>
+
+## 🧩 Kosmy Board
+
+Soundy peut s'ouvrir depuis [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) sans retaper de mot de passe,
+et un administrateur Emby peut l'administrer **depuis le Board** (demandes, notifications, comptes reliés).
+Version web seulement (pas l'application Android).
+
+**1. Régler la connexion** (une fois, par un administrateur Emby) :
+
+1. Dans Kosmy Board, ajoutez l'espace Soundy, puis ouvrez **Connexion unique** et activez-la avec :
+
+   | Champ du Board | Valeur |
+   |---|---|
+   | Adresse de retour | `https://soundy.mondomaine.fr/auth/kosmy-board/callback` |
+   | Adresse de lancement | `https://soundy.mondomaine.fr/auth/kosmy-board/login` |
+
+2. Dans Soundy, **Réglages → Kosmy Board → Connexion avec Kosmy Board** : collez l'émetteur, l'identifiant client
+   et le secret donnés par le Board, puis **Enregistrer**. Les deux adresses ci-dessus y sont aussi, prêtes à copier.
+
+**2. Relier son compte** (chaque utilisateur, une fois) : connecté avec Emby, **Réglages → Kosmy Board → Relier à Kosmy Board**,
+puis confirmez votre mot de passe Emby. Ensuite, **Ouvrir** dans le Board vous connecte directement à Soundy.
+
+- Les comptes de Soundy sont ceux d'Emby, et Emby n'ouvre une session qu'avec le mot de passe. Au moment du lien,
+  le serveur Soundy ouvre donc une **session Emby dédiée** (appareil « Soundy · Kosmy Board ») et la garde, avec le compte
+  du Board. **Le mot de passe n'est jamais gardé.**
+- **Délier** (dans les Réglages, ou depuis l'admin du Board pour un autre compte) ferme cette session dans Emby.
+  La fermer dans Emby (*Tableau de bord → Appareils*) coupe aussi le lien : il suffit de relier à nouveau.
+- Se déconnecter de Soundy après une connexion par le Board ne ferme pas la session dédiée : le lien reste actif.
+- **Admin dans le Board** : réservé aux comptes reliés qui sont **administrateurs dans Emby** (vérifié auprès d'Emby à chaque fois).
+- Réglages et comptes reliés : `DATA_DIR/kosmy-board.json` (droits 600). Le secret client n'est jamais renvoyé à l'appli.
+- Le serveur Soundy doit pouvoir joindre le Board (découverte et clés), et le serveur du Board doit pouvoir joindre Soundy.
 
 ---
 
