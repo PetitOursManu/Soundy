@@ -250,7 +250,7 @@ Version web seulement (pas l'application Android).
 puis confirmez votre mot de passe Emby. Ensuite, **Ouvrir** dans le Board vous connecte directement à Soundy.
 
 - Les comptes de Soundy sont ceux d'Emby, et Emby n'ouvre une session qu'avec le mot de passe. Au moment du lien,
-  le serveur Soundy ouvre donc une **session Emby dédiée** (appareil « Soundy · Kosmy Board ») et la garde, avec le compte
+  le serveur Soundy ouvre donc une **session Emby dédiée** (appareil « Soundy (Kosmy Board) ») et la garde, avec le compte
   du Board. **Le mot de passe n'est jamais gardé.**
 - **Délier** (dans les Réglages, ou depuis l'admin du Board pour un autre compte) ferme cette session dans Emby.
   La fermer dans Emby (*Tableau de bord → Appareils*) coupe aussi le lien : il suffit de relier à nouveau.

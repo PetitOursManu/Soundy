@@ -250,7 +250,7 @@ Web version only (not the Android app).
 then confirm your Emby password. From then on, **Open** in the Board signs you in to Soundy directly.
 
 - Soundy's accounts are Emby's, and Emby only opens a session with the password. When linking, the Soundy server
-  therefore opens a **dedicated Emby session** (device “Soundy · Kosmy Board”) and keeps it with the Board account.
+  therefore opens a **dedicated Emby session** (device “Soundy (Kosmy Board)”) and keeps it with the Board account.
   **The password is never kept.**
 - **Unlink** (in the Settings, or from the Board's admin for another account) closes that session in Emby.
   Closing it in Emby (*Dashboard → Devices*) also breaks the link: just link again.

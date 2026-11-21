@@ -86,6 +86,7 @@ const MESSAGES = {
   kbBadClientId: ['Identifiant client trop long.', 'Client ID too long.'],
   kbBadSecret: ['Secret client trop long.', 'Client secret too long.'],
   kbNotLinked: ['Votre compte n’est pas relié à Kosmy Board.', 'Your account is not linked to Kosmy Board.'],
+  kbEmbyRefused: ['Emby a refusé d’ouvrir la session dédiée (code {status}). Le détail est dans les journaux du serveur Soundy.', 'Emby refused to open the dedicated session (code {status}). Details are in the Soundy server logs.'],
 };
 
 function msg(req, key, vars = {}) {
@@ -189,7 +190,8 @@ async function verifyUser(token, userId) {
 async function embyAuthenticate(username, password, deviceId) {
   const base = await resolveEmby();
   if (!base) throw fail('embyUnreachable', 502);
-  const header = `MediaBrowser Client="Soundy", Device="Soundy · Kosmy Board", DeviceId="${deviceId}", Version="${VERSION || '1'}"`;
+  // ASCII seulement : Emby répond 400 à un en-tête avec un caractère accentué ou « · ».
+  const header = `MediaBrowser Client="Soundy", Device="Soundy (Kosmy Board)", DeviceId="${deviceId}", Version="${VERSION || '1'}"`;
   const res = await fetch(`${base}/Users/AuthenticateByName`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Emby-Authorization': header },
@@ -198,9 +200,16 @@ async function embyAuthenticate(username, password, deviceId) {
   }).catch(() => null);
   if (!res) throw fail('embyUnreachable', 502);
   if (res.status === 401 || res.status === 403) return null;
-  if (!res.ok) throw fail('embyUnreachable', 502);
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).slice(0, 200);
+    console.warn(`[kosmy-board] Emby a refusé l’ouverture de session (${res.status}) : ${detail}`);
+    throw Object.assign(fail('kbEmbyRefused', 424), { vars: { status: res.status } });
+  }
   const data = await res.json().catch(() => null);
-  if (!data?.AccessToken || !data.User?.Id) return null;
+  if (!data?.AccessToken || !data.User?.Id) {
+    console.warn('[kosmy-board] Réponse d’Emby sans session (AccessToken).');
+    throw Object.assign(fail('kbEmbyRefused', 424), { vars: { status: res.status } });
+  }
   return { token: data.AccessToken, userId: data.User.Id };
 }
 
@@ -462,11 +471,19 @@ app.delete('/api/requests/:id', auth, async (req, res) => {
 // --- Kosmy Board ---------------------------------------------------------------
 
 /** Erreur du module Kosmy Board → réponse JSON traduite. */
+// Jamais 502 ni 504 : Cloudflare (et d'autres proxys) remplacent ces réponses par leur propre page, et le
+// message disparaît (l'appli n'affiche plus que « Erreur 502 »).
+const proxySafe = (status) => (status === 502 || status === 504 ? 503 : status);
+
 function kbFail(req, res, e) {
-  if (e?.key) return res.status(e.status || 400).json({ error: msg(req, e.key) });
+  if (e?.key) {
+    if ((e.status || 400) >= 500 || e.key === 'kbEmbyRefused') console.warn(`[kosmy-board] ${req.method} ${req.path} : ${e.key}`);
+    return res.status(proxySafe(e.status || 400)).json({ error: msg(req, e.key, e.vars) });
+  }
   if (e instanceof OidcError) {
+    if (e.code !== 'password') console.warn(`[kosmy-board] ${req.method} ${req.path} : ${e.code} — ${e.message}`);
     const key = { disabled: 'kbDisabled', password: 'kbPassword', server: 'kbServer', network: 'kbBoardUnreachable', discovery: 'kbBoardUnreachable' }[e.code];
-    return res.status(e.code === 'password' ? 401 : e.code === 'server' ? 400 : 502).json({ error: key ? msg(req, key) : e.message });
+    return res.status(e.code === 'password' ? 401 : e.code === 'server' ? 400 : 503).json({ error: key ? msg(req, key) : e.message });
   }
   console.error('[kosmy-board]', e);
   return res.status(500).json({ error: e.message });

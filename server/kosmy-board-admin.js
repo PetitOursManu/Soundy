@@ -88,8 +88,8 @@ const TEXTS = {
   testOff: ['Aucune notification réglée (WEBHOOK_URL).', 'No notification set (WEBHOOK_URL).'],
   actions: ['Actions', 'Actions'],
   accountsDesc: [
-    'Comptes Kosmy Board reliés à un compte Emby. Chacun relie le sien dans les réglages de Soundy ; le délier ferme sa session « Soundy · Kosmy Board » dans Emby.',
-    'Kosmy Board accounts linked to an Emby account. Each person links their own in Soundy’s settings; unlinking closes its “Soundy · Kosmy Board” session in Emby.',
+    'Comptes Kosmy Board reliés à un compte Emby. Chacun relie le sien dans les réglages de Soundy ; le délier ferme sa session « Soundy (Kosmy Board) » dans Emby.',
+    'Kosmy Board accounts linked to an Emby account. Each person links their own in Soundy’s settings; unlinking closes its “Soundy (Kosmy Board)” session in Emby.',
   ],
   colBoard: ['Compte Kosmy Board', 'Kosmy Board account'],
   colEmby: ['Compte Emby', 'Emby account'],
