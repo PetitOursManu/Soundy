@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.7.0** | **Notifications par Kosmy Board** : chaque nouvelle demande arrive dans la cloche du Board et sur Kosmy Mobile, pour les administrateurs Emby reliés au Board. `WEBHOOK_URL` devient facultatif. Page de connexion sur PC : bobines de la cassette mieux réparties. |
 | **1.6.1** | Page de connexion sur PC : mise en page en deux colonnes (visuel à gauche, carte de connexion à droite), formulaire affiché directement. Demi-disques et cassette corrects en thème sombre automatique. |
 | **1.6.0** | **Kosmy Board** : « Se connecter avec Kosmy Board » (version web) après avoir relié son compte dans les Réglages, et administration de Soundy (demandes, notifications, comptes reliés) depuis le Board. |
 | **1.5.7** | Liste des titres : même hauteur avec ou sans mini lecteur (il passe par-dessus). Lecteur : tout tient sans défiler ; ❤ au centre du vinyle, « Sortie audio » dans le menu ⋯, téléchargement et file d'attente de part et d'autre de la source. |
@@ -265,9 +266,28 @@ puis confirmez votre mot de passe Emby. Ensuite, **Ouvrir** dans le Board vous c
 
 ## 🔔 Notifications des nouvelles demandes
 
-Quand un utilisateur envoie une demande d'ajout de musique, le serveur Soundy peut **prévenir l'administrateur**
-(sur son téléphone, Discord…). C'est **désactivé par défaut** : il suffit de renseigner la variable
+Quand un utilisateur envoie une demande d'ajout de musique, le serveur Soundy **prévient les administrateurs**.
+
+### Par Kosmy Board et Kosmy Mobile (recommandé)
+
+Avec [Kosmy Board réglé](#-kosmy-board), rien de plus à faire : chaque nouvelle demande arrive
+
+- dans la **cloche** de Kosmy Board (page Notifications) ;
+- sur le téléphone, en **notification Android de Kosmy Mobile** (relié au même compte du Board).
+
+Seuls les comptes du Board **reliés à un administrateur Emby** la reçoivent (vérifié auprès d'Emby à chaque envoi).
+Il faut donc que l'administrateur ait relié son compte : **Réglages → Kosmy Board → Relier à Kosmy Board**.
+**Réglages → Notifications des demandes → Envoyer une notification de test** vérifie que tout arrive.
+
+Soundy envoie la notification au Board avec l'identifiant et le secret client de la connexion unique,
+à l'adresse indiquée par le Board (`kosmy_notifications_endpoint`) : il faut une version de Kosmy Board qui gère les
+notifications. Kosmy Mobile, sans service Google, vérifie le Board au mieux toutes les 15 minutes appli fermée.
+
+### Par webhook (facultatif)
+
+Pour être prévenu aussi ailleurs (Discord, ntfy…), ou sans Kosmy Board, renseignez la variable
 **`WEBHOOK_URL`** du serveur Soundy. Le service est **reconnu automatiquement** d'après l'adresse.
+Avec les deux réglés, la notification part des deux côtés.
 
 **Mise en place (3 étapes)**
 

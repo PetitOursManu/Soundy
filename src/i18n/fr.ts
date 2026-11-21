@@ -330,7 +330,8 @@ const fr = {
   'notify.title': 'Être prévenu des nouvelles demandes',
   'notify.on': 'Activées · {service}',
   'notify.off': 'Non configurées',
-  'notify.help': 'Réglez la variable WEBHOOK_URL du serveur Soundy (Discord, ntfy, Gotify, Slack…). Le guide est dans le README.',
+  'notify.help':
+    'Réglez la connexion avec Kosmy Board ci-dessous et reliez votre compte : les nouvelles demandes arriveront dans la cloche du Board et sur Kosmy Mobile. Facultatif : la variable WEBHOOK_URL du serveur (Discord, ntfy, Gotify, Slack…).',
   'notify.checkServer': "Le serveur Soundy n'a pas pu vérifier votre compte Emby (variable EMBY_URL ?). Ouvrez {url} pour voir le diagnostic.",
   'notify.test': 'Envoyer une notification de test',
   'notify.sending': 'Envoi…',

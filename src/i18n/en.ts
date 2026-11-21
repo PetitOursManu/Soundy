@@ -331,7 +331,8 @@ const en: Record<keyof typeof fr, string> = {
   'notify.title': 'Get notified of new requests',
   'notify.on': 'Enabled · {service}',
   'notify.off': 'Not configured',
-  'notify.help': 'Set the WEBHOOK_URL variable on the Soundy server (Discord, ntfy, Gotify, Slack…). See the guide in the README.',
+  'notify.help':
+    'Set up Kosmy Board below and link your account: new requests will show up in the Board’s bell and on Kosmy Mobile. Optional: the WEBHOOK_URL variable on the server (Discord, ntfy, Gotify, Slack…).',
   'notify.checkServer': 'The Soundy server could not verify your Emby account (EMBY_URL variable?). Open {url} to see the diagnostics.',
   'notify.test': 'Send a test notification',
   'notify.sending': 'Sending…',

@@ -42,6 +42,7 @@ const SECRET = 'le-secret';
 let board;
 let issuer;
 const codes = new Map(); // code → { sub, nonce }
+const received = []; // notifications reçues par le faux Board : { auth, body }
 
 function sign(header, payload) {
   const enc = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -76,7 +77,16 @@ before(async () => {
   board = await listen(async (req, res) => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/oidc/.well-known/openid-configuration') {
-      return json(res, 200, { issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks` });
+      return json(res, 200, {
+        issuer, authorization_endpoint: `${issuer}/auth`, token_endpoint: `${issuer}/token`, jwks_uri: `${issuer}/jwks`,
+        kosmy_notifications_endpoint: `${board.url}/api/apps/notifications`,
+      });
+    }
+    if (u.pathname === '/api/apps/notifications' && req.method === 'POST') {
+      const n = { auth: req.headers.authorization, body: JSON.parse(await body(req)) };
+      received.push(n);
+      if (n.auth !== `Basic ${Buffer.from(`${CLIENT_ID}:${SECRET}`).toString('base64')}`) return json(res, 401, { error: 'client_auth' });
+      return json(res, 200, { delivered: n.body.to.length });
     }
     if (u.pathname === '/oidc/jwks') return json(res, 200, { keys: [{ ...publicKey.export({ format: 'jwk' }), kid: KID, use: 'sig', alg: 'RS256' }] });
     if (u.pathname === '/oidc/token' && req.method === 'POST') {
@@ -261,6 +271,27 @@ test('un autre émetteur est refusé au lancement', async () => {
   assert.equal(start.headers.get('location'), '/?kb_error=issuer');
 });
 
+test('nouvelle demande : notifiée par le Board aux seuls administrateurs reliés', async () => {
+  const before = received.length;
+  const created = await api('POST', '/api/requests', { token: 't-bob-app', user: 'u-bob', data: { type: 'album', artist: 'Air', album: 'Moon Safari', comment: 'Merci !' } });
+  assert.equal(created.status, 201);
+  for (let i = 0; i < 50 && received.length === before; i++) await new Promise((r) => setTimeout(r, 20));
+  const n = received.at(-1);
+  assert.equal(n.body.title, '🎵 Nouvelle demande Soundy');
+  assert.match(n.body.body, /bob demande l’album « Moon Safari » de Air\n💬 Merci !/);
+  assert.equal(n.body.url, '/#/requests');
+  assert.deepEqual(n.body.to, [EMANUEL.sub]);
+  await api('DELETE', `/api/requests/${created.json.id}`);
+
+  const t = await api('POST', '/api/notify/test');
+  assert.equal(t.status, 200);
+  assert.deepEqual(t.json.sent, ['board']);
+  assert.match(received.at(-1).body.body, /Ça fonctionne/);
+  assert.equal((await api('POST', '/api/notify/test', { token: 't-bob-app', user: 'u-bob' })).status, 403);
+  const st = await api('GET', '/api/notify/status');
+  assert.deepEqual(st.json, { configured: true, type: null, board: true });
+});
+
 test('admin dans le Board : sommaire, demandes et action', async () => {
   const created = await api('POST', '/api/requests', { token: 't-bob-app', user: 'u-bob', data: { type: 'album', artist: 'Daft Punk', album: 'Discovery' } });
   assert.equal(created.status, 201);
@@ -295,7 +326,8 @@ test('admin dans le Board : sommaire, demandes et action', async () => {
   assert.equal((await call('POST', 'requests', { action: 'mark-added', row: 'inconnue' })).status, 404);
   assert.equal((await call('GET', 'inconnue')).status, 404);
   const test = await call('POST', 'notifications', { action: 'send-test' });
-  assert.equal(test.json.tone, 'warning');
+  assert.equal(test.json.ok, true);
+  assert.equal(test.json.message, 'Notification de test envoyée.');
 
   // On ne se délie pas soi-même depuis le Board.
   const accounts = await call('GET', 'accounts');
@@ -322,6 +354,10 @@ test('admin dans le Board : un compte Emby non administrateur est refusé', asyn
   const res = await api('GET', p, { token: null, headers: { Authorization: `Bearer ${adminToken(BOB.sub, 'GET', `${soundy}${p}`)}` } });
   assert.equal(res.status, 403);
   assert.equal(res.json.error, 'forbidden');
+
+  // Bob est relié mais n'est pas administrateur Emby : il ne reçoit pas les notifications de demandes.
+  await api('POST', '/api/notify/test');
+  assert.deepEqual(received.at(-1).body.to, [EMANUEL.sub]);
 });
 
 test('délier : depuis le Board pour un autre compte, ou soi-même ; la session Emby dédiée est fermée', async () => {
