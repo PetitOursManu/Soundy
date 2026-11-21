@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.6.1** | Kosmy Board : « Relier à Kosmy Board » ne renvoie plus « Erreur 502 » (Emby refusait le nom d’appareil « Soundy · Kosmy Board »). Messages d’erreur lisibles même derrière Cloudflare. |
 | **1.6.0** | **Kosmy Board** : « Se connecter avec Kosmy Board » (version web) après avoir relié son compte dans les Réglages, et administration de Soundy (demandes, notifications, comptes reliés) depuis le Board. |
 | **1.5.7** | Liste des titres : même hauteur avec ou sans mini lecteur (il passe par-dessus). Lecteur : tout tient sans défiler ; ❤ au centre du vinyle, « Sortie audio » dans le menu ⋯, téléchargement et file d'attente de part et d'autre de la source. |
 | **1.5.6** | Mini lecteur : quand le titre est en pause, un glissement du doigt vers le bas le fait disparaître (la lecture est arrêtée). |
@@ -249,7 +250,7 @@ Version web seulement (pas l'application Android).
 puis confirmez votre mot de passe Emby. Ensuite, **Ouvrir** dans le Board vous connecte directement à Soundy.
 
 - Les comptes de Soundy sont ceux d'Emby, et Emby n'ouvre une session qu'avec le mot de passe. Au moment du lien,
-  le serveur Soundy ouvre donc une **session Emby dédiée** (appareil « Soundy · Kosmy Board ») et la garde, avec le compte
+  le serveur Soundy ouvre donc une **session Emby dédiée** (appareil « Soundy (Kosmy Board) ») et la garde, avec le compte
   du Board. **Le mot de passe n'est jamais gardé.**
 - **Délier** (dans les Réglages, ou depuis l'admin du Board pour un autre compte) ferme cette session dans Emby.
   La fermer dans Emby (*Tableau de bord → Appareils*) coupe aussi le lien : il suffit de relier à nouveau.

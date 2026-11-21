@@ -6,7 +6,7 @@
 //   1. connecté avec Emby, on clique « Relier à Kosmy Board » et on confirme son
 //      mot de passe Emby ;
 //   2. le serveur Soundy ouvre auprès d'Emby une session dédiée (appareil
-//      « Soundy · Kosmy Board ») et la garde, avec le compte du Board (`sub`) ;
+//      « Soundy (Kosmy Board) ») et la garde, avec le compte du Board (`sub`) ;
 //   3. ensuite, « Ouvrir » dans le Board (ou « Se connecter avec Kosmy Board »)
 //      redonne cette session au navigateur, sans mot de passe.
 // Le mot de passe n'est jamais gardé. Délier ferme la session dédiée dans Emby.

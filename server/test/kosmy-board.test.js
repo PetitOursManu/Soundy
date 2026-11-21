@@ -60,8 +60,9 @@ function adminToken(sub, method, url, extra = {}) {
 const USERS = {
   admin: { Id: 'u-admin', Name: 'admin', Policy: { IsAdministrator: true }, password: 'pw-admin' },
   bob: { Id: 'u-bob', Name: 'bob', Policy: { IsAdministrator: false }, password: 'pw-bob' },
+  broken: { Id: 'u-broken', Name: 'broken', Policy: { IsAdministrator: false }, password: 'pw' },
 };
-const tokens = new Map([['t-admin-app', 'u-admin'], ['t-bob-app', 'u-bob']]); // jeton → utilisateur
+const tokens = new Map([['t-admin-app', 'u-admin'], ['t-bob-app', 'u-bob'], ['t-broken-app', 'u-broken']]); // jeton → utilisateur
 const loggedOut = [];
 let emby;
 
@@ -96,7 +97,10 @@ before(async () => {
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/System/Info/Public') return json(res, 200, { Id: 'emby', ServerName: 'Emby' });
     if (u.pathname === '/Users/AuthenticateByName' && req.method === 'POST') {
+      // Comme le vrai Emby : 400 si l'en-tête d'identification n'est pas en ASCII.
+      if (!/^[\x20-\x7e]+$/.test(req.headers['x-emby-authorization'] || '')) return json(res, 400, {});
       const b = JSON.parse(await body(req));
+      if (b.Username === 'broken') return json(res, 500, {});
       const user = Object.values(USERS).find((x) => x.Name === b.Username && x.password === b.Pw);
       if (!user) return json(res, 401, {});
       const token = `t-${user.Name}-${randomUUID()}`;
@@ -218,6 +222,12 @@ test('relier : mauvais mot de passe refusé, puis lien avec une session Emby dé
   assert.equal(me.json.account.sub, EMANUEL.sub);
   assert.equal(me.json.account.embyUserName, 'admin');
   assert.ok(!('token' in me.json.account));
+});
+
+test('relier : un refus d’Emby donne un message lisible, jamais un 502', async () => {
+  const r = await api('POST', '/api/kosmy-board/link', { token: 't-broken-app', user: 'u-broken', data: { password: 'pw', server: 'https://emby.example.test' } });
+  assert.equal(r.status, 424);
+  assert.match(r.json.error, /Emby a refusé .*code 500/);
 });
 
 test('un parcours ne sert qu’une fois et reste lié au navigateur', async () => {

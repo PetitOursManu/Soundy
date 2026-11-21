@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.6.1** | Kosmy Board: “Link to Kosmy Board” no longer fails with “Error 502” (Emby refused the “Soundy · Kosmy Board” device name). Readable error messages, even behind Cloudflare. |
 | **1.6.0** | **Kosmy Board**: “Sign in with Kosmy Board” (web version) once your account is linked in the Settings, and Soundy administration (requests, notifications, linked accounts) from the Board. |
 | **1.5.7** | Track list: same height with or without the mini player (it now overlays the list). Player: everything fits without scrolling; ❤ in the centre of the record, “Audio output” in the ⋯ menu, download and queue on either side of the source badge. |
 | **1.5.6** | Mini player: when the track is paused, swipe it down to dismiss it (playback is stopped). |
@@ -249,7 +250,7 @@ Web version only (not the Android app).
 then confirm your Emby password. From then on, **Open** in the Board signs you in to Soundy directly.
 
 - Soundy's accounts are Emby's, and Emby only opens a session with the password. When linking, the Soundy server
-  therefore opens a **dedicated Emby session** (device “Soundy · Kosmy Board”) and keeps it with the Board account.
+  therefore opens a **dedicated Emby session** (device “Soundy (Kosmy Board)”) and keeps it with the Board account.
   **The password is never kept.**
 - **Unlink** (in the Settings, or from the Board's admin for another account) closes that session in Emby.
   Closing it in Emby (*Dashboard → Devices*) also breaks the link: just link again.
