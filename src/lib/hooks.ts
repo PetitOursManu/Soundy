@@ -106,3 +106,16 @@ export function useScrollRestore(key: string, ready: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, ready]);
 }
+
+/** Suit une media query CSS (ex. « grand écran »). */
+export function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    on();
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}

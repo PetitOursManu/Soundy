@@ -86,7 +86,7 @@
 
 | Version | Changements |
 |---|---|
-| **1.6.1** | Kosmy Board : « Relier à Kosmy Board » ne renvoie plus « Erreur 502 » (Emby refusait le nom d’appareil « Soundy · Kosmy Board »). Messages d’erreur lisibles même derrière Cloudflare. |
+| **1.6.1** | Page de connexion sur PC : mise en page en deux colonnes (visuel à gauche, carte de connexion à droite), formulaire affiché directement. Demi-disques et cassette corrects en thème sombre automatique. |
 | **1.6.0** | **Kosmy Board** : « Se connecter avec Kosmy Board » (version web) après avoir relié son compte dans les Réglages, et administration de Soundy (demandes, notifications, comptes reliés) depuis le Board. |
 | **1.5.7** | Liste des titres : même hauteur avec ou sans mini lecteur (il passe par-dessus). Lecteur : tout tient sans défiler ; ❤ au centre du vinyle, « Sortie audio » dans le menu ⋯, téléchargement et file d'attente de part et d'autre de la source. |
 | **1.5.6** | Mini lecteur : quand le titre est en pause, un glissement du doigt vers le bas le fait disparaître (la lecture est arrêtée). |

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { login } from '../api/emby';
 import { boardEnabled, LOGIN_URL } from '../api/kosmyBoard';
 import { onBackButton } from '../lib/backButton';
+import { useMediaQuery } from '../lib/hooks';
 import { Brand } from '../components/Brand';
 import { IconLock, IconServer, IconUser } from '../components/Icons';
 import { useAuth } from '../store/auth';
@@ -23,6 +24,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [board, setBoard] = useState(false);
+  // Grand écran (PC) : visuel à gauche, formulaire toujours visible à droite
+  const wide = useMediaQuery('(min-width: 960px) and (min-height: 560px)');
 
   // Connexion par Kosmy Board (version web, si le serveur Soundy l'a réglée)
   useEffect(() => {
@@ -66,42 +69,138 @@ export default function Login() {
     }
   };
 
+  const langSwitch = (
+    <div className="lang-switch" role="group" aria-label={t('lang.label')}>
+      {(['fr', 'en'] as const).map((l) => (
+        <button key={l} className={lang === l ? 'on' : ''} onClick={() => updateSettings({ language: l })} aria-pressed={lang === l}>
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+
+  const discs = (
+    <div className="discs" aria-hidden>
+      <div className="half" />
+      <div className="half" />
+      <div className="cd" />
+    </div>
+  );
+
+  const cassette = (
+    <div className="cassette" aria-hidden>
+      <div className="lbl">
+        S <small>SOUNDY · TYPE I</small>
+      </div>
+      <div className="reels">
+        <i />
+        <i />
+      </div>
+    </div>
+  );
+
+  const headline = (
+    <h1 className="headline">
+      <span>{t('login.headline1')}</span>
+      <span>{t('login.headline2')}</span>
+      <span>{t('login.headline3')}</span>
+    </h1>
+  );
+
+  const fields = (
+    <>
+      <div className="field">
+        <label htmlFor="server">{t('login.server')}</label>
+        <div className="input-wrap">
+          <IconServer />
+          <input
+            id="server"
+            type="url"
+            inputMode="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder={t('login.serverPlaceholder')}
+            value={server}
+            onChange={(e) => setServer(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor="user">{t('login.user')}</label>
+        <div className="input-wrap">
+          <IconUser />
+          <input id="user" autoComplete="username" autoCapitalize="off" value={user} onChange={(e) => setUser(e.target.value)} />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor="password">{t('login.password')}</label>
+        <div className="input-wrap">
+          <IconLock />
+          <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </div>
+      </div>
+
+      {!online && <p className="error-text">{t('login.noNetwork')}</p>}
+      {error && <p className="error-text">{error}</p>}
+
+      <button className="btn accent block" type="submit" disabled={loading || !online} style={{ marginTop: 18, height: 58 }}>
+        {loading ? <span className="loader" style={{ width: 20, height: 20 }} /> : t('login.submit')}
+      </button>
+    </>
+  );
+
+  // ---- PC : deux colonnes ----
+  if (wide) {
+    return (
+      <div className="welcome-wide">
+        <section className="welcome-hero">
+          <div className="welcome-top">
+            <Brand size={44} />
+            {langSwitch}
+          </div>
+          <div className="hero-art">
+            {discs}
+            {cassette}
+          </div>
+          {headline}
+          <p className="tagline">{t('login.tagline')}</p>
+        </section>
+
+        <section className="welcome-side">
+          <form className="login-card login-panel" onSubmit={submit}>
+            <h2 className="login-title">{t('login.title')}</h2>
+            <p className="tagline login-sub">{t('login.subtitle')}</p>
+            {fields}
+            {board && (
+              <>
+                <div className="login-or">
+                  <span>{t('common.or')}</span>
+                </div>
+                <button type="button" className="btn block" style={{ height: 54 }} onClick={() => window.location.assign(LOGIN_URL)}>
+                  {t('kb.signIn')}
+                </button>
+              </>
+            )}
+          </form>
+        </section>
+      </div>
+    );
+  }
+
+  // ---- Mobile ----
   return (
     <div className={`welcome ${step === 'form' ? 'form' : ''}`}>
       <div className="welcome-top">
         <Brand size={44} />
-        <div className="lang-switch" role="group" aria-label={t('lang.label')}>
-          {(['fr', 'en'] as const).map((l) => (
-            <button key={l} className={lang === l ? 'on' : ''} onClick={() => updateSettings({ language: l })} aria-pressed={lang === l}>
-              {l.toUpperCase()}
-            </button>
-          ))}
-        </div>
+        {langSwitch}
       </div>
-      <div className="discs" aria-hidden>
-        <div className="half" />
-        <div className="half" />
-        <div className="cd" />
-      </div>
-      {step === 'intro' && (
-        <div className="cassette" aria-hidden>
-          <div className="lbl">
-            S <small>SOUNDY · TYPE I</small>
-          </div>
-          <div className="reels">
-            <i />
-            <i />
-          </div>
-        </div>
-      )}
+      {discs}
+      {step === 'intro' && cassette}
 
       {step === 'intro' ? (
         <>
-          <h1 className="headline">
-            <span>{t('login.headline1')}</span>
-            <span>{t('login.headline2')}</span>
-            <span>{t('login.headline3')}</span>
-          </h1>
+          {headline}
           <p className="tagline">{t('login.tagline')}</p>
           <button className="btn block" onClick={() => setStep('form')} style={{ height: 60, fontSize: 16 }}>
             {t('login.start')}
@@ -114,45 +213,7 @@ export default function Login() {
           <p className="tagline" style={{ margin: '8px 0 28px' }}>
             {t('login.subtitle')}
           </p>
-
-          <div className="field">
-            <label htmlFor="server">{t('login.server')}</label>
-            <div className="input-wrap">
-              <IconServer />
-              <input
-                id="server"
-                type="url"
-                inputMode="url"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                placeholder={t('login.serverPlaceholder')}
-                value={server}
-                onChange={(e) => setServer(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="user">{t('login.user')}</label>
-            <div className="input-wrap">
-              <IconUser />
-              <input id="user" autoComplete="username" autoCapitalize="off" value={user} onChange={(e) => setUser(e.target.value)} />
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="password">{t('login.password')}</label>
-            <div className="input-wrap">
-              <IconLock />
-              <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-          </div>
-
-          {!online && <p className="error-text">{t('login.noNetwork')}</p>}
-          {error && <p className="error-text">{error}</p>}
-
-          <button className="btn accent block" type="submit" disabled={loading || !online} style={{ marginTop: 18, height: 58 }}>
-            {loading ? <span className="loader" style={{ width: 20, height: 20 }} /> : t('login.submit')}
-          </button>
+          {fields}
           {boardButton}
           <button type="button" className="btn block" style={{ marginTop: 18, boxShadow: 'none', color: 'var(--text-2)' }} onClick={() => setStep('intro')}>
             {t('common.back')}

@@ -7,6 +7,7 @@ const en: Record<keyof typeof fr, string> = {
   'common.delete': 'Delete',
   'common.retry': 'Retry',
   'common.back': 'Back',
+  'common.or': 'or',
   'common.close': 'Close',
   'common.save': 'Save',
   'common.confirm': 'Confirm',
