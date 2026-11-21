@@ -13,6 +13,8 @@ export interface Session {
   token: string;
   isAdmin: boolean;
   deviceId: string;
+  /** Session ouverte par Kosmy Board : partagée avec le serveur Soundy, jamais fermée à la déconnexion. */
+  via?: 'kosmy-board';
 }
 
 export interface Track {

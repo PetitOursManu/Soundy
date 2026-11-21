@@ -29,7 +29,9 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ session: s, client: new EmbyClient(s) });
   },
   logout: () => {
-    get().client?.logout();
+    // La session ouverte par Kosmy Board est celle que garde le serveur Soundy pour ce lien :
+    // on l'oublie sur cet appareil sans la fermer dans Emby (« Délier » la ferme).
+    if (get().session?.via !== 'kosmy-board') get().client?.logout();
     localStorage.removeItem(KEY);
     set({ session: null, client: null });
   },

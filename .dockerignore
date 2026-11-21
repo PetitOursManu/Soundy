@@ -5,3 +5,4 @@ data
 android
 .git
 *.log
+server/test

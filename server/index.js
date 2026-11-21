@@ -15,14 +15,19 @@
 //   NOTIFY_LANG   (option) Langue des notifications : fr (défaut) | en
 //   EMBY_PROXY    (option) "true" pour activer le proxy /emby → EMBY_URL
 //   MAX_PENDING   Nombre max de demandes en attente par utilisateur (défaut 20)
+//
+// Kosmy Board (option, réglé dans les réglages de Soundy par un admin Emby) :
+// connexion par le Board et admin dans le Board, voir kosmy-board.js.
 // ============================================================================
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
+import { CALLBACK_PATH, createKosmyBoard, LOGIN_PATH, OidcError, SESSION_PATH } from './kosmy-board.js';
+import { createKosmyBoardAdmin } from './kosmy-board-admin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
@@ -39,6 +44,15 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || '*').split(',').map((s) => s.t
 const WEBHOOK_URL = (process.env.WEBHOOK_URL || '').trim().replace(/^["']|["']$/g, '');
 const EMBY_PROXY = /^(1|true|yes)$/i.test(process.env.EMBY_PROXY || '');
 const MAX_PENDING = Number(process.env.MAX_PENDING || 20);
+// Version de Soundy (package.json racine, copié dans l'image Docker)
+const VERSION = (() => {
+  for (const f of [path.join(__dirname, '..', 'package.json'), path.join(__dirname, 'package.json')]) {
+    try {
+      return JSON.parse(readFileSync(f, 'utf8')).version;
+    } catch { /* fichier suivant */ }
+  }
+  return '';
+})();
 
 if (!EMBY_URL) {
   console.warn('⚠️  EMBY_URL n’est pas défini : les demandes seront refusées (impossible de vérifier les utilisateurs).');
@@ -64,6 +78,14 @@ const MESSAGES = {
   unknownRoute: ['Route inconnue.', 'Unknown route.'],
   webhookMissing: ["Aucune notification configurée : renseignez la variable WEBHOOK_URL du serveur Soundy.", 'No notification configured: set the WEBHOOK_URL variable on the Soundy server.'],
   webhookFailed: ['Échec de l’envoi ({type}) : {error}. Vérifiez l’adresse WEBHOOK_URL.', 'Sending failed ({type}): {error}. Check the WEBHOOK_URL address.'],
+  kbDisabled: ['La connexion avec Kosmy Board n’est pas réglée dans Soundy.', 'Sign-in with Kosmy Board is not set up in Soundy.'],
+  kbPassword: ['Mot de passe Emby incorrect.', 'Wrong Emby password.'],
+  kbServer: ['Adresse du serveur Emby invalide.', 'Invalid Emby server address.'],
+  kbBoardUnreachable: ['Kosmy Board est injoignable depuis le serveur Soundy.', 'Kosmy Board is unreachable from the Soundy server.'],
+  kbBadIssuer: ['Émetteur : une adresse http(s) complète, par exemple https://board.mondomaine.fr/oidc.', 'Issuer: a full http(s) address, for example https://board.mydomain.com/oidc.'],
+  kbBadClientId: ['Identifiant client trop long.', 'Client ID too long.'],
+  kbBadSecret: ['Secret client trop long.', 'Client secret too long.'],
+  kbNotLinked: ['Votre compte n’est pas relié à Kosmy Board.', 'Your account is not linked to Kosmy Board.'],
 };
 
 function msg(req, key, vars = {}) {
@@ -161,6 +183,33 @@ async function verifyUser(token, userId) {
   authCache.set(key, { user, expires: Date.now() + 5 * 60_000 });
   if (authCache.size > 1000) authCache.delete(authCache.keys().next().value);
   return user;
+}
+
+/** Ouvre une session Emby (pour la liaison avec Kosmy Board). Renvoie { token, userId }, ou null si refusé. */
+async function embyAuthenticate(username, password, deviceId) {
+  const base = await resolveEmby();
+  if (!base) throw fail('embyUnreachable', 502);
+  const header = `MediaBrowser Client="Soundy", Device="Soundy · Kosmy Board", DeviceId="${deviceId}", Version="${VERSION || '1'}"`;
+  const res = await fetch(`${base}/Users/AuthenticateByName`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Emby-Authorization': header },
+    body: JSON.stringify({ Username: username, Pw: String(password ?? '') }),
+    signal: AbortSignal.timeout(10_000),
+  }).catch(() => null);
+  if (!res) throw fail('embyUnreachable', 502);
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw fail('embyUnreachable', 502);
+  const data = await res.json().catch(() => null);
+  if (!data?.AccessToken || !data.User?.Id) return null;
+  return { token: data.AccessToken, userId: data.User.Id };
+}
+
+/** Ferme une session Emby (et l'oublie du cache). */
+async function embyLogout(token) {
+  for (const k of authCache.keys()) if (k.startsWith(`${token}:`)) authCache.delete(k);
+  const base = await resolveEmby();
+  if (!base) return;
+  await fetch(`${base}/Sessions/Logout`, { method: 'POST', headers: { 'X-Emby-Token': token }, signal: AbortSignal.timeout(8000) }).catch(() => {});
 }
 
 async function auth(req, res, next) {
@@ -261,6 +310,57 @@ function validateNew(body) {
   return { value: { type, artist, album: album || undefined, tracks: type === 'tracks' ? tracks : [], comment: comment || undefined } };
 }
 
+/** Change le statut d'une demande (API et admin dans Kosmy Board). */
+async function setRequestStatus(r, status, adminNote) {
+  r.status = status;
+  r.adminNote = typeof adminNote === 'string' && adminNote.trim() ? adminNote.trim().slice(0, 500) : undefined;
+  r.updatedAt = new Date().toISOString();
+  await saveStore();
+  return r;
+}
+
+/** Supprime une demande (API et admin dans Kosmy Board). */
+async function removeRequest(id) {
+  const i = requests.findIndex((x) => x.id === id);
+  if (i < 0) return false;
+  requests.splice(i, 1);
+  await saveStore();
+  return true;
+}
+
+// ----------------------------------------------------------------------------
+// Kosmy Board : connexion par le Board et admin dans le Board
+// ----------------------------------------------------------------------------
+const kb = createKosmyBoard({
+  dataDir: DATA_DIR,
+  emby: { authenticate: embyAuthenticate, check: verifyUser, logout: embyLogout },
+});
+const kbAdmin = createKosmyBoardAdmin({
+  kb,
+  deps: {
+    version: VERSION,
+    requests: () => requests,
+    setStatus: setRequestStatus,
+    remove: removeRequest,
+    embyBase: () => resolveEmby(),
+    embyUrl: EMBY_URL,
+    checkEmby: verifyUser,
+    webhook: { configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, lang: NOTIFY_EN ? 'en' : 'fr' },
+    sendWebhook,
+  },
+});
+
+/** Adresse publique de cette instance (derrière le reverse proxy : X-Forwarded-Proto / Host). */
+const baseOf = (req) => `${req.protocol}://${req.get('host')}`;
+
+/** Code d'erreur montré par l'appli après un retour du Board (traduit côté appli). */
+function kbErrorCode(e) {
+  if (!(e instanceof OidcError)) return 'failed';
+  if (['network', 'discovery'].includes(e.code)) return 'unreachable';
+  if (['disabled', 'issuer', 'state', 'denied', 'not_linked', 'expired'].includes(e.code)) return e.code;
+  return 'failed';
+}
+
 // ----------------------------------------------------------------------------
 // Application
 // ----------------------------------------------------------------------------
@@ -275,7 +375,7 @@ app.use('/api', (req, res, next) => {
     res.set('Access-Control-Allow-Origin', CORS_ORIGINS.includes('*') ? '*' : origin);
     res.set('Vary', 'Origin');
     res.set('Access-Control-Allow-Headers', 'Content-Type, X-Emby-Token, X-Emby-UserId, Accept-Language');
-    res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.set('Access-Control-Max-Age', '86400');
   }
   if (req.method === 'OPTIONS') return res.sendStatus(204);
@@ -345,11 +445,7 @@ app.patch('/api/requests/:id', auth, async (req, res) => {
   if (!r) return res.status(404).json({ error: msg(req, 'notFound') });
   const status = req.body?.status;
   if (!['pending', 'added', 'refused'].includes(status)) return res.status(400).json({ error: msg(req, 'badStatus') });
-  r.status = status;
-  r.adminNote = typeof req.body.adminNote === 'string' && req.body.adminNote.trim() ? req.body.adminNote.trim().slice(0, 500) : undefined;
-  r.updatedAt = new Date().toISOString();
-  await saveStore();
-  res.json(r);
+  res.json(await setRequestStatus(r, status, req.body.adminNote));
 });
 
 // Suppression : l'auteur (si en attente) ou un admin
@@ -359,12 +455,97 @@ app.delete('/api/requests/:id', auth, async (req, res) => {
   const r = requests[i];
   const own = r.userId === req.user.id && r.status === 'pending';
   if (!own && !req.user.isAdmin) return res.status(403).json({ error: msg(req, 'forbidden') });
-  requests.splice(i, 1);
-  await saveStore();
+  await removeRequest(r.id);
   res.json({ ok: true });
 });
 
+// --- Kosmy Board ---------------------------------------------------------------
+
+/** Erreur du module Kosmy Board → réponse JSON traduite. */
+function kbFail(req, res, e) {
+  if (e?.key) return res.status(e.status || 400).json({ error: msg(req, e.key) });
+  if (e instanceof OidcError) {
+    const key = { disabled: 'kbDisabled', password: 'kbPassword', server: 'kbServer', network: 'kbBoardUnreachable', discovery: 'kbBoardUnreachable' }[e.code];
+    return res.status(e.code === 'password' ? 401 : e.code === 'server' ? 400 : 502).json({ error: key ? msg(req, key) : e.message });
+  }
+  console.error('[kosmy-board]', e);
+  return res.status(500).json({ error: e.message });
+}
+
+// L'appli propose-t-elle « Se connecter avec Kosmy Board » ?
+app.get('/api/auth/kosmy-board', (_req, res) => res.json({ enabled: kb.enabled() }));
+
+// Réglages de la connexion (administrateurs Emby)
+app.get('/api/kosmy-board/settings', auth, (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
+  res.json(kb.settings(baseOf(req)));
+});
+app.put('/api/kosmy-board/settings', auth, (req, res) => {
+  if (!req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
+  try {
+    res.json(kb.saveSettings(req.body, baseOf(req)));
+  } catch (e) {
+    kbFail(req, res, e);
+  }
+});
+
+// Mon lien avec Kosmy Board
+app.get('/api/kosmy-board/me', auth, (req, res) => {
+  res.json({ enabled: kb.enabled(), account: kb.accountOf(req.user.id) });
+});
+app.post('/api/kosmy-board/link', auth, async (req, res) => {
+  try {
+    const { url, cookie } = await kb.startLink({ base: baseOf(req), user: req.user, password: req.body?.password, server: req.body?.server });
+    res.set('Set-Cookie', cookie).json({ url });
+  } catch (e) {
+    kbFail(req, res, e);
+  }
+});
+app.delete('/api/kosmy-board/me', auth, async (req, res) => {
+  const mine = kb.accountOf(req.user.id);
+  if (!mine) return res.status(404).json({ error: msg(req, 'kbNotLinked') });
+  await kb.unlink(mine.sub);
+  res.json({ ok: true });
+});
+
+// Fin de la connexion par le Board : le ticket du cookie contre la session Emby reliée
+app.post(SESSION_PATH, async (req, res) => {
+  try {
+    const { session, cookie } = await kb.redeem({ base: baseOf(req), req });
+    res.set('Set-Cookie', cookie).set('Cache-Control', 'no-store').json(session);
+  } catch (e) {
+    res.status(401).json({ error: kbErrorCode(e) });
+  }
+});
+
+// Admin dans Kosmy Board
+app.use(kbAdmin);
+
 app.use('/api', (req, res) => res.status(404).json({ error: msg(req, 'unknownRoute') }));
+
+// ----------------------------------------------------------------------------
+// Connexion par Kosmy Board (parcours dans le navigateur)
+// ----------------------------------------------------------------------------
+app.get(LOGIN_PATH, async (req, res) => {
+  try {
+    const { url, cookie } = await kb.start({ base: baseOf(req), iss: typeof req.query.iss === 'string' ? req.query.iss : '' });
+    res.set('Set-Cookie', cookie).redirect(303, url);
+  } catch (e) {
+    console.warn('[kosmy-board] connexion impossible :', e.message);
+    res.redirect(303, `/?kb_error=${kbErrorCode(e)}`);
+  }
+});
+
+app.get(CALLBACK_PATH, async (req, res) => {
+  try {
+    const { mode, account, cookies } = await kb.finish({ base: baseOf(req), query: req.query, req });
+    console.log(`[kosmy-board] ${mode === 'link' ? 'lien' : 'connexion'} : ${account.embyUserName} ↔ ${account.email || account.name || account.sub}`);
+    res.set('Set-Cookie', cookies).redirect(303, mode === 'link' ? '/?kb=linked#/settings' : '/?kb=1');
+  } catch (e) {
+    console.warn('[kosmy-board] retour refusé :', e.message);
+    res.redirect(303, `/?kb_error=${kbErrorCode(e)}`);
+  }
+});
 
 // ----------------------------------------------------------------------------
 // Proxy Emby optionnel : https://soundy.exemple.fr/emby/... → EMBY_URL/...

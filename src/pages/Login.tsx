@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { login } from '../api/emby';
+import { boardEnabled, LOGIN_URL } from '../api/kosmyBoard';
 import { onBackButton } from '../lib/backButton';
 import { Brand } from '../components/Brand';
 import { IconLock, IconServer, IconUser } from '../components/Icons';
@@ -21,6 +22,22 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [board, setBoard] = useState(false);
+
+  // Connexion par Kosmy Board (version web, si le serveur Soundy l'a réglée)
+  useEffect(() => {
+    let alive = true;
+    void boardEnabled().then((on) => alive && setBoard(on));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const boardButton = board && (
+    <button type="button" className="btn block" style={{ marginTop: 14, height: 54 }} onClick={() => window.location.assign(LOGIN_URL)}>
+      {t('kb.signIn')}
+    </button>
+  );
 
   // Bouton retour d'Android : formulaire → écran d'accueil
   useEffect(
@@ -89,6 +106,7 @@ export default function Login() {
           <button className="btn block" onClick={() => setStep('form')} style={{ height: 60, fontSize: 16 }}>
             {t('login.start')}
           </button>
+          {boardButton}
         </>
       ) : (
         <form className="login-card" onSubmit={submit} style={{ marginTop: 'auto', marginBottom: 'auto', paddingTop: 20 }}>
@@ -135,6 +153,7 @@ export default function Login() {
           <button className="btn accent block" type="submit" disabled={loading || !online} style={{ marginTop: 18, height: 58 }}>
             {loading ? <span className="loader" style={{ width: 20, height: 20 }} /> : t('login.submit')}
           </button>
+          {boardButton}
           <button type="button" className="btn block" style={{ marginTop: 18, boxShadow: 'none', color: 'var(--text-2)' }} onClick={() => setStep('intro')}>
             {t('common.back')}
           </button>

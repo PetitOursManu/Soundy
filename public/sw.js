@@ -19,7 +19,8 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   // On ne gère que les fichiers de l'application elle-même
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/emby/')) return;
+  // (ni l'API, ni Emby, ni la connexion par Kosmy Board, qui redirige vers le Board)
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/emby/') || url.pathname.startsWith('/auth/')) return;
 
   if (req.mode === 'navigate') {
     event.respondWith(

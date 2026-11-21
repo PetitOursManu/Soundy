@@ -5,7 +5,14 @@
   "description": "Serveur Soundy : demandes d'ajout de musique + hébergement de l'application web",
   "type": "module",
   "main": "index.js",
-  "scripts": { "start": "node index.js" },
-  "dependencies": { "express": "^4.21.2" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }

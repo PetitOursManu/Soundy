@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_VERSION } from '../api/emby';
+import { BoardAccount, boardApi, BoardSettings } from '../api/kosmyBoard';
 import { RequestsApi } from '../api/requests';
 import { Brand } from '../components/Brand';
-import { IconBack, IconLogout, IconServer } from '../components/Icons';
+import { IconBack, IconLock, IconLogout, IconServer } from '../components/Icons';
 import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
 import { Key, useT } from '../i18n';
@@ -183,6 +184,8 @@ export default function Settings() {
         </>
       )}
 
+      {!isNative() && <KosmyBoardSection />}
+
       <div className="section-title">{t('settings.requestsServer')}</div>
       <div className="card">
         <div className="field">
@@ -332,5 +335,230 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
         {sending ? t('notify.sending') : t('notify.test')}
       </button>
     </div>
+  );
+}
+
+/** Adresse à copier dans Kosmy Board. */
+function CopyRow({ label, value }: { label: string; value: string }) {
+  const { t } = useT();
+  const copy = () =>
+    navigator.clipboard
+      ?.writeText(value)
+      .then(() => toast(t('kb.copied'), 'success'))
+      .catch(() => {});
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div className="field-label">{label}</div>
+      <div className="row" style={{ gap: 10, marginTop: 6 }}>
+        <code className="ellipsis" style={{ flex: 1, minWidth: 0, fontSize: 12.5, padding: '10px 12px', borderRadius: 12, boxShadow: 'var(--neu-in)' }}>
+          {value}
+        </code>
+        <button className="btn sm" onClick={copy}>
+          {t('kb.copy')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Kosmy Board (version web) : relier son compte pour ouvrir Soundy depuis le Board,
+ * et, pour les administrateurs Emby, les réglages de la connexion.
+ */
+function KosmyBoardSection() {
+  const { t, locale } = useT();
+  const session = useAuth((s) => s.session)!;
+  const logout = useAuth((s) => s.logout);
+  const [me, setMe] = useState<{ enabled: boolean; account: BoardAccount | null } | null>(null);
+  const [config, setConfig] = useState<BoardSettings | null>(null);
+  const [form, setForm] = useState({ issuer: '', clientId: '', secret: '' });
+  const [saving, setSaving] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [unlinkOpen, setUnlinkOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    boardApi
+      .me(session)
+      .then((m) => alive && setMe(m))
+      .catch(() => alive && setMe(null));
+    if (session.isAdmin) {
+      boardApi
+        .settings(session)
+        .then((c) => {
+          if (!alive) return;
+          setConfig(c);
+          setForm({ issuer: c.issuer, clientId: c.clientId, secret: '' });
+        })
+        .catch(() => {});
+    }
+    return () => {
+      alive = false;
+    };
+  }, [session]);
+
+  // Pas de serveur Soundy à cette adresse, ou connexion non réglée pour un non-admin : rien à montrer.
+  if (!me || (!me.enabled && !config)) return null;
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const c = await boardApi.saveSettings(session, { issuer: form.issuer, clientId: form.clientId, ...(form.secret ? { secret: form.secret } : {}) });
+      setConfig(c);
+      setForm({ issuer: c.issuer, clientId: c.clientId, secret: '' });
+      setMe({ ...me, enabled: c.enabled });
+      toast(t('kb.saved'), 'success');
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const link = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { url } = await boardApi.link(session, password);
+      window.location.assign(url);
+    } catch (err) {
+      toast((err as Error).message, 'error');
+      setBusy(false);
+    }
+  };
+
+  const unlink = async () => {
+    setBusy(true);
+    try {
+      await boardApi.unlink(session);
+      setUnlinkOpen(false);
+      // La session ouverte par le Board vient d'être fermée dans Emby.
+      if (session.via === 'kosmy-board') {
+        usePlayer.getState().stop();
+        clearPagedCache();
+        logout();
+        return;
+      }
+      setMe({ ...me, account: null });
+      toast(t('kb.unlinked'), 'success');
+    } catch (err) {
+      toast((err as Error).message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const account = me.account;
+  const since = account?.linkedAt ? new Date(account.linkedAt).toLocaleDateString(locale, { dateStyle: 'medium' }) : '';
+
+  return (
+    <>
+      <div className="section-title">Kosmy Board</div>
+      {me.enabled && (
+        <div className="card">
+          <div className="row" style={{ justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ fontSize: 15 }}>{account ? t('kb.linkedTo', { name: account.name || account.email }) : t('kb.notLinked')}</strong>
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.5 }}>
+                {account ? t('kb.linkedHint', { date: since }) : t('kb.linkHint')}
+              </div>
+            </div>
+            <span className={`badge ${account ? 'added' : 'pending'}`}>{account ? 'ON' : 'OFF'}</span>
+          </div>
+          {account ? (
+            <button className="btn sm danger" style={{ marginTop: 14 }} disabled={busy} onClick={() => setUnlinkOpen(true)}>
+              {t('kb.unlink')}
+            </button>
+          ) : (
+            <button className="btn sm" style={{ marginTop: 14 }} onClick={() => setLinkOpen(true)}>
+              {t('kb.link')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {config && (
+        <div className="card" style={{ marginTop: me.enabled ? 18 : 0 }}>
+          <strong style={{ fontSize: 15 }}>{t('kb.setupTitle')}</strong>
+          <p className="muted" style={{ fontSize: 12.5, lineHeight: 1.5, margin: '4px 0 16px' }}>
+            {t('kb.setupHint')}
+          </p>
+          <div className="field">
+            <label htmlFor="kb-issuer">{t('kb.issuer')}</label>
+            <div className="input-wrap">
+              <IconServer />
+              <input
+                id="kb-issuer"
+                type="url"
+                inputMode="url"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder="https://board.example.com/oidc"
+                value={form.issuer}
+                onChange={(e) => setForm({ ...form, issuer: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="kb-client">{t('kb.clientId')}</label>
+            <div className="input-wrap">
+              <input id="kb-client" autoCapitalize="off" spellCheck={false} value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="kb-secret">{t('kb.secret')}</label>
+            <div className="input-wrap">
+              <IconLock />
+              <input
+                id="kb-secret"
+                type="password"
+                autoComplete="off"
+                placeholder={config.secretSet ? t('kb.secretKept') : ''}
+                value={form.secret}
+                onChange={(e) => setForm({ ...form, secret: e.target.value })}
+              />
+            </div>
+          </div>
+          <button className="btn sm accent" disabled={saving} onClick={() => void save()}>
+            {saving ? t('kb.saving') : t('common.save')}
+          </button>
+          <CopyRow label={t('kb.redirectUri')} value={config.redirectUri} />
+          <CopyRow label={t('kb.loginUri')} value={config.loginUri} />
+        </div>
+      )}
+
+      <Sheet open={linkOpen} onClose={() => setLinkOpen(false)} title={t('kb.linkTitle')} description={t('kb.linkText', { user: session.userName })}>
+        <form onSubmit={(e) => void link(e)}>
+          <div className="field">
+            <label htmlFor="kb-password">{t('login.password')}</label>
+            <div className="input-wrap">
+              <IconLock />
+              <input id="kb-password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+          </div>
+          <div className="row" style={{ gap: 14 }}>
+            <button type="button" className="btn block" onClick={() => setLinkOpen(false)}>
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn block accent" disabled={busy}>
+              {busy ? t('kb.redirecting') : t('kb.continue')}
+            </button>
+          </div>
+        </form>
+      </Sheet>
+
+      <Sheet open={unlinkOpen} onClose={() => setUnlinkOpen(false)} title={t('kb.unlinkTitle')} description={t(session.via === 'kosmy-board' ? 'kb.unlinkTextHere' : 'kb.unlinkText')}>
+        <div className="row" style={{ gap: 14 }}>
+          <button className="btn block" onClick={() => setUnlinkOpen(false)}>
+            {t('common.cancel')}
+          </button>
+          <button className="btn block danger" disabled={busy} onClick={() => void unlink()}>
+            {t('kb.unlink')}
+          </button>
+        </div>
+      </Sheet>
+    </>
   );
 }
