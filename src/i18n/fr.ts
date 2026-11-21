@@ -6,6 +6,7 @@ const fr = {
   'common.delete': 'Supprimer',
   'common.retry': 'Réessayer',
   'common.back': 'Retour',
+  'common.or': 'ou',
   'common.close': 'Fermer',
   'common.save': 'Enregistrer',
   'common.confirm': 'Confirmer',
