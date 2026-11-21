@@ -70,14 +70,14 @@ export class RequestsApi {
     return this.call<MusicRequest>(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
   }
 
-  /** Notifications admin : configurées ? pour quel service ? */
+  /** Notifications admin : configurées ? par Kosmy Board (board) et/ou par quel webhook (type) ? */
   notifyStatus() {
-    return this.call<{ configured: boolean; type: string | null }>('/notify/status');
+    return this.call<{ configured: boolean; type: string | null; board?: boolean }>('/notify/status');
   }
 
-  /** Envoie une notification de test (admin). */
+  /** Envoie une notification de test (admin). `warning` : un des deux canaux a échoué. */
   notifyTest() {
-    return this.call<{ ok: true; type: string }>('/notify/test', { method: 'POST' });
+    return this.call<{ ok: true; sent?: string[]; type: string | null; warning?: string }>('/notify/test', { method: 'POST' });
   }
 
   remove(id: string) {

@@ -10,7 +10,9 @@
 //   DATA_DIR      Dossier de stockage des demandes (défaut ./data)
 //   CORS_ORIGINS  Origines autorisées, séparées par des virgules (défaut *)
 //   WEBHOOK_URL   (option) Notification à chaque nouvelle demande : Discord, ntfy,
-//                 Gotify, Slack, Mattermost… (service détecté d'après l'adresse)
+//                 Gotify, Slack, Mattermost… (service détecté d'après l'adresse).
+//                 Avec Kosmy Board réglé, les demandes sont aussi notifiées par le Board
+//                 (cloche du Board et Kosmy Mobile) : WEBHOOK_URL devient facultatif.
 //   WEBHOOK_TYPE  (option) Force le format : discord | slack | gotify | ntfy | json
 //   NOTIFY_LANG   (option) Langue des notifications : fr (défaut) | en
 //   EMBY_PROXY    (option) "true" pour activer le proxy /emby → EMBY_URL
@@ -76,7 +78,11 @@ const MESSAGES = {
   badStatus: ['Statut invalide.', 'Invalid status.'],
   forbidden: ['Action non autorisée.', 'Action not allowed.'],
   unknownRoute: ['Route inconnue.', 'Unknown route.'],
-  webhookMissing: ["Aucune notification configurée : renseignez la variable WEBHOOK_URL du serveur Soundy.", 'No notification configured: set the WEBHOOK_URL variable on the Soundy server.'],
+  webhookMissing: ['Aucune notification configurée : réglez Kosmy Board dans Soundy, ou la variable WEBHOOK_URL du serveur.', 'No notification configured: set up Kosmy Board in Soundy, or the WEBHOOK_URL variable on the server.'],
+  boardNotifyFailed: ['Kosmy Board : {error}', 'Kosmy Board: {error}'],
+  boardNoAdmin: ['aucun compte administrateur Emby n’est relié au Board (Réglages → Relier à Kosmy Board).', 'no Emby administrator account is linked to the Board (Settings → Link to Kosmy Board).'],
+  boardUnsupported: ['ce Kosmy Board ne reçoit pas encore de notifications : mettez-le à jour.', 'this Kosmy Board cannot receive notifications yet: update it.'],
+  boardUnreachable: ['le Board est injoignable depuis le serveur Soundy.', 'the Board is unreachable from the Soundy server.'],
   webhookFailed: ['Échec de l’envoi ({type}) : {error}. Vérifiez l’adresse WEBHOOK_URL.', 'Sending failed ({type}): {error}. Check the WEBHOOK_URL address.'],
   kbDisabled: ['La connexion avec Kosmy Board n’est pas réglée dans Soundy.', 'Sign-in with Kosmy Board is not set up in Soundy.'],
   kbPassword: ['Mot de passe Emby incorrect.', 'Wrong Emby password.'],
@@ -284,8 +290,26 @@ async function sendWebhook(title, text) {
 /** Langue des notifications envoyées à l'administrateur (NOTIFY_LANG = fr | en). */
 const NOTIFY_EN = /^en/i.test(process.env.NOTIFY_LANG || '');
 
+/** Message lisible pour un échec d'envoi par Kosmy Board. */
+function boardError(req, error) {
+  const key = { no_admin: 'boardNoAdmin', unsupported: 'boardUnsupported', unreachable: 'boardUnreachable' }[error];
+  return key ? msg(req, key) : String(error);
+}
+
+/**
+ * Envoie une notification aux administrateurs : par Kosmy Board (s'il est réglé) et par le webhook (s'il l'est).
+ * Renvoie { board?, webhook? } : le résultat de chaque canal essayé.
+ */
+async function notifyAdmins(title, text) {
+  const [board, webhook] = await Promise.all([
+    kb.enabled() ? kb.notifyAdmins({ title, body: text, url: '/#/requests' }) : null,
+    WEBHOOK_URL ? sendWebhook(title, text) : null,
+  ]);
+  return { ...(board ? { board } : {}), ...(webhook ? { webhook } : {}) };
+}
+
 async function notify(r) {
-  if (!WEBHOOK_URL) return;
+  if (!kb.enabled() && !WEBHOOK_URL) return;
   const quoted = (x) => (NOTIFY_EN ? `“${x}”` : `« ${x} »`);
   const what =
     r.type === 'album'
@@ -297,8 +321,9 @@ async function notify(r) {
         : `${r.tracks.length} titre(s) de ${r.artist} : ${r.tracks.map(quoted).join(', ')}`;
   const title = NOTIFY_EN ? '🎵 New Soundy request' : '🎵 Nouvelle demande Soundy';
   const text = `${r.userName} ${NOTIFY_EN ? 'asks for' : 'demande'} ${what}${r.comment ? `\n💬 ${r.comment}` : ''}`;
-  const result = await sendWebhook(title, text);
-  if (!result.ok) console.warn(`Notification (${result.type}) en échec :`, result.error);
+  const result = await notifyAdmins(title, text);
+  if (result.board && !result.board.ok) console.warn('Notification par Kosmy Board en échec :', result.board.error);
+  if (result.webhook && !result.webhook.ok) console.warn(`Notification (${result.webhook.type}) en échec :`, result.webhook.error);
 }
 
 // ----------------------------------------------------------------------------
@@ -355,7 +380,7 @@ const kbAdmin = createKosmyBoardAdmin({
     embyUrl: EMBY_URL,
     checkEmby: verifyUser,
     webhook: { configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, lang: NOTIFY_EN ? 'en' : 'fr' },
-    sendWebhook,
+    notifyAdmins: (title, text) => notifyAdmins(title, text),
   },
 });
 
@@ -401,25 +426,30 @@ app.get('/api/health', async (_req, res) => {
     ok: true,
     name: 'soundy',
     emby: { configured: !!EMBY_URL, reachable: !!base, url: base ?? (EMBY_URL || null) },
-    notify: { configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null },
+    notify: { configured: !!WEBHOOK_URL || kb.enabled(), type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, board: kb.enabled() },
   });
 });
 
-// Notification de test (admin) : vérifie le réglage WEBHOOK_URL
+// Notification de test (admin) : par Kosmy Board et/ou par le webhook (WEBHOOK_URL)
 app.post('/api/notify/test', auth, async (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: msg(req, 'adminOnly') });
-  if (!WEBHOOK_URL) return res.status(400).json({ error: msg(req, 'webhookMissing') });
+  if (!WEBHOOK_URL && !kb.enabled()) return res.status(400).json({ error: msg(req, 'webhookMissing') });
   const en = /^en/i.test(req.get('Accept-Language') || '');
-  const result = await sendWebhook(
+  const result = await notifyAdmins(
     en ? '🔔 Soundy notification test' : '🔔 Test de notification Soundy',
     en ? `It works! New music requests will be sent here. (${req.user.name})` : `Ça fonctionne ! Les nouvelles demandes de musique arriveront ici. (${req.user.name})`,
   );
-  if (!result.ok) return res.status(502).json({ error: msg(req, 'webhookFailed', { type: result.type, error: result.error }) });
-  res.json({ ok: true, type: result.type });
+  const errors = [];
+  if (result.board && !result.board.ok) errors.push(msg(req, 'boardNotifyFailed', { error: boardError(req, result.board.error) }));
+  if (result.webhook && !result.webhook.ok) errors.push(msg(req, 'webhookFailed', { type: result.webhook.type, error: result.webhook.error }));
+  const sent = [result.board?.ok && 'board', result.webhook?.ok && result.webhook.type].filter(Boolean);
+  // Tout a échoué : erreur. Un canal sur deux : succès, avec l'erreur de l'autre en avertissement.
+  if (!sent.length) return res.status(502).json({ error: errors.join(' · ') });
+  res.json({ ok: true, sent, type: result.webhook?.type ?? null, ...(errors.length ? { warning: errors.join(' · ') } : {}) });
 });
 
 app.get('/api/notify/status', auth, (req, res) => {
-  res.json({ configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null });
+  res.json({ configured: !!WEBHOOK_URL || kb.enabled(), type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, board: kb.enabled() });
 });
 
 // Liste des demandes : les miennes, ou toutes (admin)
@@ -618,6 +648,7 @@ if (existsSync(DIST_DIR)) {
 await loadStore();
 app.listen(PORT, () => {
   console.log(`🎧 Soundy écoute sur http://0.0.0.0:${PORT}  (Emby : ${EMBY_URL || 'non configuré'})`);
-  console.log(`🔔 Notifications des demandes : ${WEBHOOK_URL ? `activées (${webhookType(WEBHOOK_URL)})` : 'désactivées (WEBHOOK_URL vide)'}`);
+  const channels = [kb.enabled() && 'Kosmy Board', WEBHOOK_URL && webhookType(WEBHOOK_URL)].filter(Boolean);
+  console.log(`🔔 Notifications des demandes : ${channels.length ? `activées (${channels.join(' + ')})` : 'désactivées (ni Kosmy Board ni WEBHOOK_URL)'}`);
   void resolveEmby(true);
 });

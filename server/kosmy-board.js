@@ -19,6 +19,10 @@
 // Admin dans le Board (kosmy-board-admin.js) : verifyAdminToken vérifie le jeton
 // kb-admin+jwt avec les mêmes réglages et les mêmes clés (docs/admin-api.md du Board).
 //
+// Notifications (docs/notifications.md du Board) : envoyées aux comptes du Board reliés à un administrateur
+// Emby, à l'adresse `kosmy_notifications_endpoint` de la découverte, avec le secret client (Basic).
+// Le Board les montre dans sa cloche et Kosmy Mobile sur le téléphone.
+//
 // Réglages et comptes reliés dans DATA_DIR/kosmy-board.json (mode 600).
 // Le secret client et les sessions Emby ne sont jamais renvoyés tels quels.
 // ============================================================================
@@ -498,6 +502,44 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
     }
   }
 
+  /* ---------- notifications ---------- */
+
+  /**
+   * Envoie une notification aux administrateurs de Soundy, par Kosmy Board. `url` : une page de Soundy
+   * (relative, par exemple « /#/requests »). Renvoie { ok, delivered } ou { ok: false, error } :
+   * « disabled » (Board non réglé), « unsupported » (Board trop ancien), « no_admin » (aucun administrateur
+   * Emby relié), « unreachable », ou le code d'erreur du Board.
+   */
+  async function notifyAdmins({ title, body, url }) {
+    const r = read();
+    if (!enabled(r)) return { ok: false, error: 'disabled' };
+    let endpoint;
+    try {
+      endpoint = (await discover(r.issuer)).doc.kosmy_notifications_endpoint;
+    } catch {
+      return { ok: false, error: 'unreachable' };
+    }
+    if (typeof endpoint !== 'string' || !/^https?:\/\//.test(endpoint)) return { ok: false, error: 'unsupported' };
+    // Les administrateurs d'aujourd'hui : on demande à Emby, avec la session reliée de chacun.
+    const checks = await Promise.all(
+      r.accounts.map((a) => emby.check(a.token, a.embyUserId).then((u) => (u?.isAdmin ? a.sub : null)).catch(() => null)),
+    );
+    const to = checks.filter(Boolean);
+    if (!to.length) return { ok: false, error: 'no_admin' };
+    let res;
+    try {
+      res = await getJson(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: basicAuth(r.clientId, r.secret) },
+        body: JSON.stringify({ title, body, url, to }),
+      });
+    } catch {
+      return { ok: false, error: 'unreachable' };
+    }
+    if (!res.ok) return { ok: false, error: res.json?.error || `HTTP ${res.status}` };
+    return { ok: true, delivered: Number(res.json?.delivered) || 0 };
+  }
+
   /* ---------- admin dans le Board ---------- */
 
   const seenJti = new Map(); // jti → fin de validité (ms) : un jeton d'admin ne sert qu'une fois
@@ -546,6 +588,7 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
     redeem,
     startLink,
     authenticateAdmin,
+    notifyAdmins,
     publicAccount,
   };
 }

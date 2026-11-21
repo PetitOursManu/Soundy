@@ -71,11 +71,17 @@ const TEXTS = {
   doneRefused: ['Demande refusée.', 'Request refused.'],
   donePending: ['Demande remise en attente.', 'Request back to pending.'],
   doneDeleted: ['Demande supprimée.', 'Request deleted.'],
-  notifDesc: ['Une notification à chaque nouvelle demande (Discord, ntfy, Gotify, Slack…).', 'A notification for each new request (Discord, ntfy, Gotify, Slack…).'],
-  notifHowTitle: ['Notifications non réglées', 'Notifications not set'],
+  notifDesc: [
+    'Une notification à chaque nouvelle demande, pour les administrateurs : dans la cloche de Kosmy Board et sur Kosmy Mobile. En plus, si vous le souhaitez, un webhook (Discord, ntfy, Gotify, Slack…).',
+    'A notification for each new request, for administrators: in Kosmy Board’s bell and on Kosmy Mobile. Optionally, a webhook too (Discord, ntfy, Gotify, Slack…).',
+  ],
+  boardNotif: ['Kosmy Board et Kosmy Mobile', 'Kosmy Board and Kosmy Mobile'],
+  boardNotifOn: ['Activées · administrateurs reliés au Board', 'On · administrators linked to the Board'],
+  webhookNotif: ['Webhook (WEBHOOK_URL)', 'Webhook (WEBHOOK_URL)'],
+  notifHowTitle: ['Webhook facultatif', 'Optional webhook'],
   notifHow: [
-    'Réglez la variable WEBHOOK_URL du serveur Soundy, puis redéployez. Le guide est dans le README de Soundy.',
-    'Set the WEBHOOK_URL variable on the Soundy server, then redeploy. The guide is in Soundy’s README.',
+    'Les notifications passent par Kosmy Board. Pour les recevoir aussi ailleurs (Discord, ntfy…), réglez la variable WEBHOOK_URL du serveur Soundy, puis redéployez.',
+    'Notifications go through Kosmy Board. To also get them elsewhere (Discord, ntfy…), set the WEBHOOK_URL variable on the Soundy server, then redeploy.',
   ],
   service: ['Service', 'Service'],
   language: ['Langue des notifications', 'Notification language'],
@@ -85,6 +91,10 @@ const TEXTS = {
   testText: ['Ça fonctionne ! Les nouvelles demandes de musique arriveront ici. ({name}, depuis Kosmy Board)', 'It works! New music requests will be sent here. ({name}, from Kosmy Board)'],
   testSent: ['Notification de test envoyée.', 'Test notification sent.'],
   testFailed: ['Échec de l’envoi ({type}) : {error}. Vérifiez WEBHOOK_URL.', 'Sending failed ({type}): {error}. Check WEBHOOK_URL.'],
+  testBoardFailed: ['Kosmy Board : {error}', 'Kosmy Board: {error}'],
+  boardNoAdmin: ['aucun compte administrateur Emby n’est relié au Board.', 'no Emby administrator account is linked to the Board.'],
+  boardUnsupported: ['ce Kosmy Board ne reçoit pas encore de notifications : mettez-le à jour.', 'this Kosmy Board cannot receive notifications yet: update it.'],
+  boardUnreachable: ['le Board est injoignable depuis le serveur Soundy.', 'the Board is unreachable from the Soundy server.'],
   testOff: ['Aucune notification réglée (WEBHOOK_URL).', 'No notification set (WEBHOOK_URL).'],
   actions: ['Actions', 'Actions'],
   accountsDesc: [
@@ -134,7 +144,8 @@ class AdminError extends Error {
  * @param {object} o
  * @param {object} o.kb module kosmy-board.js
  * @param {object} o.deps { version, requests(), setStatus(r, status, note), remove(id), embyBase(), embyUrl, checkEmby(token, userId),
- *                         webhook: { configured, type, lang }, sendWebhook(title, text) }
+ *                         webhook: { configured, type, lang },
+ *                         notifyAdmins(title, text) → { board?, webhook? } }
  */
 export function createKosmyBoardAdmin({ kb, deps }) {
   function texts(req) {
@@ -179,7 +190,7 @@ export function createKosmyBoardAdmin({ kb, deps }) {
           { label: t('version'), value: deps.version },
           { label: t('embyState'), value: base ? t('reachable') : t('unreachable') },
           { label: t('embyAddress'), value: base || deps.embyUrl || t('notSet') },
-          { label: t('notifState'), value: deps.webhook.configured ? t('on', { type: SERVICE_NAMES[deps.webhook.type] || deps.webhook.type }) : t('off') },
+          { label: t('notifState'), value: t('on', { type: ['Kosmy Board', ...(deps.webhook.configured ? [SERVICE_NAMES[deps.webhook.type] || deps.webhook.type] : [])].join(' + ') }) },
           { label: t('linkedCount'), value: kb.accounts().length },
         ],
       },
@@ -246,11 +257,13 @@ export function createKosmyBoardAdmin({ kb, deps }) {
     blocks.push({
       type: 'fields',
       items: [
-        { label: t('notifState'), value: w.configured ? t('on', { type: SERVICE_NAMES[w.type] || w.type }) : t('off') },
-        ...(w.configured ? [{ label: t('service'), value: SERVICE_NAMES[w.type] || w.type }, { label: t('language'), value: w.lang === 'en' ? 'English' : 'Français' }] : []),
+        // L'admin dans le Board passe par la connexion unique : elle est donc réglée, et les notifications du Board aussi.
+        { label: t('boardNotif'), value: t('boardNotifOn') },
+        { label: t('webhookNotif'), value: w.configured ? t('on', { type: SERVICE_NAMES[w.type] || w.type }) : t('off') },
+        { label: t('language'), value: w.lang === 'en' ? 'English' : 'Français' },
       ],
     });
-    if (w.configured) blocks.push({ type: 'actions', title: t('actions'), items: [{ id: 'send-test', label: t('test'), description: t('testDesc') }] });
+    blocks.push({ type: 'actions', title: t('actions'), items: [{ id: 'send-test', label: t('test'), description: t('testDesc') }] });
     return { id: 'notifications', title: t('notifications'), description: t('notifDesc'), blocks };
   }
 
@@ -323,9 +336,13 @@ export function createKosmyBoardAdmin({ kb, deps }) {
     }
 
     if (id === 'notifications' && action === 'send-test') {
-      if (!deps.webhook.configured) return { message: t('testOff'), tone: 'warning' };
-      const res = await deps.sendWebhook(t('testTitle'), t('testText', { name: ctx.user.name }));
-      if (!res.ok) return { message: t('testFailed', { type: res.type, error: res.error }), tone: 'danger' };
+      const res = await deps.notifyAdmins(t('testTitle'), t('testText', { name: ctx.user.name }));
+      const boardKey = { no_admin: 'boardNoAdmin', unsupported: 'boardUnsupported', unreachable: 'boardUnreachable' };
+      const errors = [];
+      if (res.board && !res.board.ok) errors.push(t('testBoardFailed', { error: boardKey[res.board.error] ? t(boardKey[res.board.error]) : res.board.error }));
+      if (res.webhook && !res.webhook.ok) errors.push(t('testFailed', { type: res.webhook.type, error: res.webhook.error }));
+      if (!res.board && !res.webhook) return { message: t('testOff'), tone: 'warning' };
+      if (errors.length) return { message: errors.join(' · '), tone: res.board?.ok || res.webhook?.ok ? 'warning' : 'danger' };
       return { message: t('testSent') };
     }
 

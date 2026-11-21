@@ -2738,6 +2738,13 @@ input[type='search']::-webkit-search-decoration {
   opacity: 0.95;
 }
 
+.welcome-hero .cassette .reels {
+  /* PC : cassette entière visible, bobines réparties sur sa largeur */
+  justify-content: space-around;
+  gap: 0;
+  margin: 16px 6px 0;
+}
+
 .welcome-hero .headline {
   margin-top: 0;
   font-size: clamp(44px, min(5vw, 8.5dvh), 78px);

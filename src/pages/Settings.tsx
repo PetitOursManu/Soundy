@@ -277,7 +277,7 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
   const { t } = useT();
   const session = useAuth((s) => s.session)!;
   const api = useMemo(() => new RequestsApi(requestsUrl, session), [requestsUrl, session]);
-  const [status, setStatus] = useState<{ configured: boolean; type: string | null } | null | 'error'>(null);
+  const [status, setStatus] = useState<{ configured: boolean; type: string | null; board?: boolean } | null | 'error'>(null);
   const [errMsg, setErrMsg] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -299,8 +299,9 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
   const test = async () => {
     setSending(true);
     try {
-      await api.notifyTest();
-      toast(t('notify.sent'), 'success');
+      const r = await api.notifyTest();
+      if (r.warning) toast(`${t('notify.sent')} — ${r.warning}`, 'info');
+      else toast(t('notify.sent'), 'success');
     } catch (e) {
       toast((e as Error).message, 'error');
     } finally {
@@ -320,7 +321,11 @@ function NotifySettings({ requestsUrl }: { requestsUrl: string }) {
               : status === null
                 ? '…'
                 : configured
-                  ? t('notify.on', { service: SERVICE_NAMES[status.type ?? 'json'] ?? status.type ?? '' })
+                  ? t('notify.on', {
+                      service: [status.board ? 'Kosmy Board' : '', status.type ? (SERVICE_NAMES[status.type] ?? status.type) : '']
+                        .filter(Boolean)
+                        .join(' + '),
+                    })
                   : t('notify.off')}
           </div>
         </div>

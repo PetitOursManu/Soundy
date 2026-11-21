@@ -73,7 +73,8 @@ export default function Player() {
   const shownTime = preview ?? currentTime;
   const total = duration || track.duration;
   const progress = total > 0 ? Math.min(1, Math.max(0, shownTime / total)) : 0;
-  const armOnRecord = isPlaying || currentTime > 0;
+  // Bras posé sur le disque pendant la lecture, relevé (position de repos) en pause, comme une vraie platine.
+  const armOnRecord = isPlaying;
   const RepeatIcon = repeat === 'one' ? IconRepeatOne : IconRepeat;
 
   return (
