@@ -1897,6 +1897,16 @@ input[type='search']::-webkit-search-decoration {
   background: linear-gradient(145deg, rgba(70, 76, 96, 0.8), rgba(45, 49, 62, 0.7));
 }
 
+/* Thème « automatique » + système en sombre */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .discs .half {
+    background: radial-gradient(circle, var(--bg) 0 13%, #4a4e5c 13.5% 15%, #3a3e4b 15.5% 100%);
+  }
+  :root:not([data-theme='light']) .cassette {
+    background: linear-gradient(145deg, rgba(70, 76, 96, 0.8), rgba(45, 49, 62, 0.7));
+  }
+}
+
 .cassette .lbl {
   height: 30px;
   border-radius: 6px;
@@ -2658,4 +2668,159 @@ input[type='search']::-webkit-search-decoration {
 
 .chip.fav-chip.on {
   color: #f0507a;
+}
+
+/* --------------------------------------------------------------------------
+   Connexion sur grand écran (PC) : visuel à gauche, carte de connexion à droite
+   -------------------------------------------------------------------------- */
+.welcome-wide {
+  /* Sort de la colonne .app (760 px) pour occuper toute la fenêtre */
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(400px, 1fr);
+  gap: clamp(28px, 3.5vw, 56px);
+  padding: clamp(20px, 2.6vw, 36px) max(clamp(20px, 2.6vw, 36px), calc((100vw - 1480px) / 2));
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.welcome-hero {
+  --d: clamp(170px, 30dvh, 290px);
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(28px, 3.2vw, 48px);
+  border-radius: 36px;
+  background: linear-gradient(160deg, var(--bg), var(--bg-deep));
+  box-shadow: var(--neu-xl);
+  overflow: hidden;
+  animation: page-in 0.6s var(--ease) both;
+}
+
+/* Halo coloré derrière les disques */
+.welcome-hero::before {
+  content: '';
+  position: absolute;
+  inset: 5% -10% 20% 10%;
+  background: radial-gradient(closest-side at 40% 50%, rgba(255, 214, 165, 0.45), transparent 70%),
+    radial-gradient(closest-side at 70% 55%, rgba(170, 182, 255, 0.5), transparent 70%);
+  filter: blur(30px);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.hero-art {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--d) * 1.25);
+}
+
+.welcome-hero .discs {
+  width: calc(var(--d) * 1.8);
+  margin: 0;
+  transform: translateX(-8%);
+}
+
+.welcome-hero .cassette {
+  top: auto;
+  right: 2%;
+  bottom: 0;
+  width: calc(var(--d) * 0.85);
+  min-width: 170px;
+  transform: rotate(-6deg);
+  opacity: 0.95;
+}
+
+.welcome-hero .headline {
+  margin-top: 0;
+  font-size: clamp(44px, min(5vw, 8.5dvh), 78px);
+}
+
+.welcome-hero .tagline {
+  max-width: 440px;
+  margin-top: 16px;
+  color: var(--text-2);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.welcome-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 0;
+  padding: 12px 0;
+}
+
+.login-panel {
+  /* margin auto (et non justify-content) : la carte reste lisible et défile si la fenêtre est basse */
+  margin: auto 0;
+  width: min(440px, 100%);
+  padding: clamp(30px, 3.4vw, 44px);
+  border-radius: 32px;
+  background: var(--bg);
+  box-shadow: var(--neu-xl);
+}
+
+.login-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.login-sub {
+  margin: 8px 0 28px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.login-or {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 16px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-or::before,
+.login-or::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  box-shadow: var(--neu-in-sm);
+}
+
+@media (max-height: 720px) {
+  .welcome-wide .login-panel {
+    padding-top: 26px;
+    padding-bottom: 26px;
+  }
+  .welcome-wide .login-panel .field {
+    margin-bottom: 10px;
+  }
+  .welcome-wide .login-panel .input-wrap {
+    height: 48px;
+  }
+  .welcome-wide .login-title {
+    font-size: 28px;
+  }
+  .welcome-wide .login-sub {
+    margin-bottom: 16px;
+  }
+  .welcome-wide .login-or {
+    margin: 14px 0 12px;
+  }
 }

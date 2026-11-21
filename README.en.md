@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.6.1** | Sign-in page on desktop: two-column layout (artwork on the left, sign-in card on the right), form shown straight away. Half discs and cassette now right in automatic dark theme. |
 | **1.6.0** | **Kosmy Board**: “Sign in with Kosmy Board” (web version) once your account is linked in the Settings, and Soundy administration (requests, notifications, linked accounts) from the Board. |
 | **1.5.7** | Track list: same height with or without the mini player (it now overlays the list). Player: everything fits without scrolling; ❤ in the centre of the record, “Audio output” in the ⋯ menu, download and queue on either side of the source badge. |
 | **1.5.6** | Mini player: when the track is paused, swipe it down to dismiss it (playback is stopped). |
