@@ -16,10 +16,12 @@
 //   WEBHOOK_TYPE  (option) Force le format : discord | slack | gotify | ntfy | json
 //   NOTIFY_LANG   (option) Langue des notifications : fr (défaut) | en
 //   EMBY_PROXY    (option) "true" pour activer le proxy /emby → EMBY_URL
-//   MAX_PENDING   Nombre max de demandes en attente par utilisateur (défaut 20)
+//   MAX_PENDING   Nombre max de demandes en attente par utilisateur (défaut 20 ;
+//                 réglable compte par compte depuis Kosmy Board)
 //
 // Kosmy Board (option, réglé dans les réglages de Soundy par un admin Emby) :
-// connexion par le Board et admin dans le Board, voir kosmy-board.js.
+// connexion par le Board, admin dans le Board et utilisateurs gérés par le Board,
+// voir kosmy-board.js, kosmy-board-admin.js et kosmy-board-users.js.
 // ============================================================================
 import express from 'express';
 import { randomUUID } from 'node:crypto';
@@ -30,6 +32,7 @@ import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { CALLBACK_PATH, createKosmyBoard, LOGIN_PATH, OidcError, SESSION_PATH } from './kosmy-board.js';
 import { createKosmyBoardAdmin } from './kosmy-board-admin.js';
+import { createAccessRules, createKosmyBoardUsers } from './kosmy-board-users.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8080);
@@ -93,6 +96,9 @@ const MESSAGES = {
   kbBadSecret: ['Secret client trop long.', 'Client secret too long.'],
   kbNotLinked: ['Votre compte n’est pas relié à Kosmy Board.', 'Your account is not linked to Kosmy Board.'],
   kbEmbyRefused: ['Emby a refusé d’ouvrir la session dédiée (code {status}). Le détail est dans les journaux du serveur Soundy.', 'Emby refused to open the dedicated session (code {status}). Details are in the Soundy server logs.'],
+  accountDisabled: ['Votre accès à Soundy a été retiré par un administrateur (Kosmy Board).', 'Your access to Soundy was removed by an administrator (Kosmy Board).'],
+  requestsOff: ['Votre compte ne peut pas faire de demande d’ajout de musique.', 'Your account cannot make music requests.'],
+  badJson: ['Requête illisible (JSON invalide).', 'Unreadable request (invalid JSON).'],
 };
 
 function msg(req, key, vars = {}) {
@@ -232,7 +238,9 @@ async function auth(req, res, next) {
   const userId = req.get('X-Emby-UserId');
   if (!token || !userId) return res.status(401).json({ error: msg(req, 'authRequired') });
   try {
-    req.user = await verifyUser(token, userId);
+    // Rôle et accès décidés dans Kosmy Board (s'il gère ce compte), sinon ceux d'Emby.
+    req.user = kb.applyAccess(await verifyUser(token, userId));
+    if (req.user.disabled) return res.status(403).json({ error: msg(req, 'accountDisabled'), code: 'account_disabled' });
     next();
   } catch (e) {
     res.status(e.status || 500).json({ error: e.key ? msg(req, e.key) : e.message });
@@ -365,10 +373,20 @@ async function removeRequest(id) {
 // ----------------------------------------------------------------------------
 // Kosmy Board : connexion par le Board et admin dans le Board
 // ----------------------------------------------------------------------------
+const accessRules = createAccessRules({ maxPending: MAX_PENDING });
 const kb = createKosmyBoard({
   dataDir: DATA_DIR,
   emby: { authenticate: embyAuthenticate, check: verifyUser, logout: embyLogout },
+  rules: accessRules,
 });
+/** Session Emby vérifiée, avec le rôle et l'accès décidés dans Kosmy Board. */
+const checkUser = async (token, userId) => kb.applyAccess(await verifyUser(token, userId));
+/** Demandes en attente permises à un utilisateur : réglage du Board pour son compte, sinon MAX_PENDING. */
+const pendingLimit = (userId) => {
+  const v = kb.valuesOf(userId)?.maxPending;
+  return Number.isInteger(v) && v >= 0 ? v : MAX_PENDING;
+};
+const kbUsers = createKosmyBoardUsers({ kb, rules: accessRules, checkUser });
 const kbAdmin = createKosmyBoardAdmin({
   kb,
   deps: {
@@ -378,7 +396,7 @@ const kbAdmin = createKosmyBoardAdmin({
     remove: removeRequest,
     embyBase: () => resolveEmby(),
     embyUrl: EMBY_URL,
-    checkEmby: verifyUser,
+    checkEmby: checkUser,
     webhook: { configured: !!WEBHOOK_URL, type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, lang: NOTIFY_EN ? 'en' : 'fr' },
     notifyAdmins: (title, text) => notifyAdmins(title, text),
   },
@@ -391,7 +409,7 @@ const baseOf = (req) => `${req.protocol}://${req.get('host')}`;
 function kbErrorCode(e) {
   if (!(e instanceof OidcError)) return 'failed';
   if (['network', 'discovery'].includes(e.code)) return 'unreachable';
-  if (['disabled', 'issuer', 'state', 'denied', 'not_linked', 'expired'].includes(e.code)) return e.code;
+  if (['disabled', 'issuer', 'state', 'denied', 'not_linked', 'expired', 'disabled_account'].includes(e.code)) return e.code;
   return 'failed';
 }
 
@@ -448,6 +466,11 @@ app.post('/api/notify/test', auth, async (req, res) => {
   res.json({ ok: true, sent, type: result.webhook?.type ?? null, ...(errors.length ? { warning: errors.join(' · ') } : {}) });
 });
 
+// Mon accès à Soundy : rôle réel (Kosmy Board, sinon Emby). 403 « account_disabled » si l'accès est retiré.
+app.get('/api/me', auth, (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ id: req.user.id, name: req.user.name, isAdmin: req.user.isAdmin, maxPending: pendingLimit(req.user.id) });
+});
+
 app.get('/api/notify/status', auth, (req, res) => {
   res.json({ configured: !!WEBHOOK_URL || kb.enabled(), type: WEBHOOK_URL ? webhookType(WEBHOOK_URL) : null, board: kb.enabled() });
 });
@@ -464,8 +487,10 @@ app.get('/api/requests', auth, (req, res) => {
 app.post('/api/requests', auth, async (req, res) => {
   const { value, error } = validateNew(req.body);
   if (error) return res.status(400).json({ error: msg(req, error) });
+  const limit = pendingLimit(req.user.id);
+  if (limit === 0) return res.status(403).json({ error: msg(req, 'requestsOff') });
   const pending = requests.filter((r) => r.userId === req.user.id && r.status === 'pending').length;
-  if (pending >= MAX_PENDING) {
+  if (pending >= limit) {
     return res.status(429).json({ error: msg(req, 'tooMany', { n: pending }) });
   }
   const now = new Date().toISOString();
@@ -565,10 +590,17 @@ app.post(SESSION_PATH, async (req, res) => {
   }
 });
 
-// Admin dans Kosmy Board
+// Admin dans Kosmy Board, et utilisateurs gérés par le Board
 app.use(kbAdmin);
+app.use(kbUsers);
 
 app.use('/api', (req, res) => res.status(404).json({ error: msg(req, 'unknownRoute') }));
+
+// JSON illisible (express.json) : une réponse JSON, pas la page d'erreur d'Express.
+app.use('/api', (err, req, res, next) => {
+  if (err?.type !== 'entity.parse.failed' && err?.type !== 'entity.too.large') return next(err);
+  res.status(err.status || 400).json({ error: req.path.startsWith('/kosmy-board/') ? 'invalid' : msg(req, 'badJson'), message: msg(req, 'badJson') });
+});
 
 // ----------------------------------------------------------------------------
 // Connexion par Kosmy Board (parcours dans le navigateur)
