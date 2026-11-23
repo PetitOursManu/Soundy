@@ -86,6 +86,7 @@
 
 | Version | Changes |
 |---|---|
+| **1.8.0** | **Users managed by Kosmy Board**: from the Board, an administrator picks each linked account’s role in Soundy (administrator or member, without changing anything in Emby) and its number of pending requests, or removes its access to Soundy. |
 | **1.7.0** | **Notifications through Kosmy Board**: each new request shows up in the Board’s bell and on Kosmy Mobile, for Emby administrators linked to the Board. `WEBHOOK_URL` becomes optional. Desktop sign-in page: cassette reels better spread out. Player: the turntable arm lifts again when paused. |
 | **1.6.1** | Sign-in page on desktop: two-column layout (artwork on the left, sign-in card on the right), form shown straight away. Half discs and cassette now right in automatic dark theme. |
 | **1.6.0** | **Kosmy Board**: “Sign in with Kosmy Board” (web version) once your account is linked in the Settings, and Soundy administration (requests, notifications, linked accounts) from the Board. |
@@ -215,7 +216,7 @@ Put it behind your HTTPS reverse proxy (Nginx Proxy Manager, Traefik, Caddy…),
 | `WEBHOOK_TYPE` | | Forces the notification format (`discord`, `ntfy`, `gotify`, `slack`, `json`). |
 | `NOTIFY_LANG` | | Notification language: `fr` (default) or `en`. |
 | `EMBY_PROXY` | | `true` to expose Emby through `https://soundy.mydomain.com/emby` (see troubleshooting). |
-| `MAX_PENDING` | | Maximum number of pending requests per user (default `20`). |
+| `MAX_PENDING` | | Maximum number of pending requests per user (default `20`, adjustable per account from [Kosmy Board](#-kosmy-board)). |
 
 ### Without Docker
 
@@ -232,7 +233,7 @@ EMBY_URL=http://localhost:8096 node server/index.js
 ## 🧩 Kosmy Board
 
 Soundy can be opened from [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) without typing a password again,
-and an Emby administrator can manage it **from the Board** (requests, notifications, linked accounts).
+and an administrator can manage it **from the Board** (requests, notifications, linked accounts) and set everyone's access there.
 Web version only (not the Android app).
 
 **1. Set up sign-in** (once, by an Emby administrator):
@@ -256,9 +257,29 @@ then confirm your Emby password. From then on, **Open** in the Board signs you i
 - **Unlink** (in the Settings, or from the Board's admin for another account) closes that session in Emby.
   Closing it in Emby (*Dashboard → Devices*) also breaks the link: just link again.
 - Signing out of Soundy after a Board sign-in does not close the dedicated session: the link stays active.
-- **Admin in the Board**: only for linked accounts that are **Emby administrators** (checked with Emby every time).
+- **Admin in the Board**: only for linked accounts that are **Soundy administrators**: role picked in the Board (see
+  below), otherwise administrator in Emby (checked with Emby every time).
 - Settings and linked accounts: `DATA_DIR/kosmy-board.json` (mode 600). The client secret is never sent back to the app.
 - The Soundy server must reach the Board (discovery and keys), and the Board's server must reach Soundy.
+
+**3. Manage users from the Board** (protocol `kosmy.board-users.v1`): in the Board, a person's access to the Soundy
+instance is set with a **role** and a **restriction**:
+
+| In the Board | Effect in Soundy |
+|---|---|
+| **Administrator** role | Manages Soundy: all requests, settings, admin in the Board, request notifications. |
+| **Member** role | Listens and makes requests, without administration (even if Emby administrator). |
+| **Pending requests at most** | Replaces `MAX_PENDING` for this account; `0`: cannot make requests. |
+| **Remove access** | Account refused everywhere in Soundy (password or Board sign-in, requests, admin in the Board) and dedicated Emby session closed. The Board can restore it. |
+
+- Soundy's accounts are Emby's, and Soundy has **no administrator rights on Emby**: it does not create Emby accounts
+  and changes nothing in Emby (the role only applies in Soundy). The Board therefore manages accounts that are
+  **already linked**; for someone who is not yet, it shows that they must first link their Emby account in Soundy
+  (step 2). Their role and restriction then apply: on linking, when they sign in through the Board, or with “Resync”.
+- Removing access closes the dedicated Emby session: once access is restored, the person links their account again
+  to sign in through the Board. The Emby account stays usable in other Emby apps: disabling it in Emby is up to the
+  Emby administrator.
+- With no role picked in the Board, nothing changes: Soundy administrator = Emby administrator.
 
 ---
 
@@ -275,7 +296,8 @@ With [Kosmy Board set up](#-kosmy-board), there is nothing more to do: each new 
 - in Kosmy Board’s **bell** (Notifications page);
 - on the phone, as a **Kosmy Mobile Android notification** (signed in to the same Board account).
 
-Only Board accounts **linked to an Emby administrator** get it (checked with Emby on every send).
+Only Board accounts **linked to a Soundy administrator** get it: role picked in the Board, otherwise administrator in
+Emby (checked with Emby on every send).
 The administrator must have linked their account: **Settings → Kosmy Board → Link to Kosmy Board**.
 **Settings → Request notifications → Send a test notification** checks that everything arrives.
 

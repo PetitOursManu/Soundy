@@ -19,6 +19,11 @@
 // Admin dans le Board (kosmy-board-admin.js) : verifyAdminToken vérifie le jeton
 // kb-admin+jwt avec les mêmes réglages et les mêmes clés (docs/admin-api.md du Board).
 //
+// Utilisateurs gérés par le Board (kosmy-board-users.js, docs/users-api.md du Board) : un compte relié peut
+// recevoir du Board un rôle propre à Soundy (`role` : admin | member), des restrictions (`values`) et être
+// désactivé (`disabled`). applyAccess() les applique à l'utilisateur Emby partout où Soundy vérifie un compte.
+// Les comptes Emby eux-mêmes ne sont ni créés ni modifiés : Soundy n'a aucun droit d'administration sur Emby.
+//
 // Notifications (docs/notifications.md du Board) : envoyées aux comptes du Board reliés à un administrateur
 // Emby, à l'adresse `kosmy_notifications_endpoint` de la découverte, avec le secret client (Basic).
 // Le Board les montre dans sa cloche et Kosmy Mobile sur le téléphone.
@@ -195,8 +200,9 @@ export function verifyAdminToken(token, { keys, issuer, clientId, method, path: 
  * @param {object} o.emby { base(): adresse d'Emby vue du serveur (ou null), authenticate(user, password, deviceId), check(token, userId), logout(token) }
  * @param {Function} [o.fetchImpl] pour les tests
  * @param {Function} [o.now] pour les tests
+ * @param {object} [o.rules] règles de l'accès géré par le Board (kosmy-board-users.js) : { clean({ role, values }, current) }
  */
-export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(...a), now = () => Date.now() }) {
+export function createKosmyBoard({ dataDir, emby, rules = null, fetchImpl = (...a) => fetch(...a), now = () => Date.now() }) {
   const file = path.join(dataDir, 'kosmy-board.json');
   const flows = new Map(); // state → { verifier, nonce, issuer, mode, browser, link?, exp }
   const tickets = new Map(); // ticket → { sub, exp }
@@ -231,6 +237,10 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
     embyUserName: a.embyUserName || '',
     linkedAt: a.linkedAt || '',
     lastLogin: a.lastLogin || '',
+    // Accès géré par le Board : rôle propre à Soundy (sinon celui d'Emby) et compte désactivé.
+    role: a.role || null,
+    values: a.role && a.values ? a.values : null,
+    disabled: Boolean(a.disabled),
   });
 
   /** Réglages montrés aux administrateurs Emby (jamais le secret). */
@@ -281,6 +291,95 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
   };
   const accountBySub = (sub) => read().accounts.find((x) => x.sub === sub) || null;
   const accounts = () => read().accounts.map(publicAccount);
+
+  /* ---------- accès géré par le Board ---------- */
+
+  /**
+   * Applique à un utilisateur Emby vérifié ({ id, name, isAdmin }) l'accès décidé dans le Board :
+   * `isAdmin` vient du rôle choisi dans le Board (sinon d'Emby), `disabled` dit si l'accès à Soundy est retiré.
+   */
+  function applyAccess(user) {
+    if (!user) return user;
+    const a = read().accounts.find((x) => x.embyUserId === user.id);
+    if (!a) return { ...user, disabled: false };
+    return { ...user, isAdmin: a.role ? a.role === 'admin' : user.isAdmin, disabled: Boolean(a.disabled) };
+  }
+
+  /** Restrictions d'un utilisateur Emby (`values` du Board), ou null si son accès n'est pas géré par le Board. */
+  function valuesOf(embyUserId) {
+    const a = read().accounts.find((x) => x.embyUserId === embyUserId);
+    return a?.role && a.values && typeof a.values === 'object' ? a.values : null;
+  }
+
+  /** Vérifie la session auprès d'Emby, puis applique l'accès décidé dans le Board. */
+  const check = async (token, userId) => applyAccess(await emby.check(token, userId));
+
+  /**
+   * Les comptes reliés avec leur rôle réel : celui choisi dans le Board, sinon celui d'Emby (demandé à Emby
+   * avec la session reliée ; null si elle ne répond plus). Pour la liste du Board et la règle « au moins un admin ».
+   */
+  async function linkedAccess() {
+    return Promise.all(read().accounts.map(async (a) => {
+      let role = a.role || null;
+      if (!role && !a.disabled) {
+        const u = await emby.check(a.token, a.embyUserId).catch(() => null);
+        role = u ? (u.isAdmin ? 'admin' : 'member') : null;
+      }
+      return { sub: a.sub, embyUserName: a.embyUserName || '', role, managed: Boolean(a.role), values: a.values || null, disabled: Boolean(a.disabled) };
+    }));
+  }
+
+  /** Reste-t-il un administrateur actif parmi les comptes reliés, sans compter `sub` ? */
+  async function otherAdmin(sub) {
+    return (await linkedAccess()).some((a) => a.sub !== sub && !a.disabled && a.role === 'admin');
+  }
+
+  /**
+   * Accès décidé dans le Board pour le compte relié à `sub` : rôle et restrictions, nom et e-mail du Board,
+   * compte réactivé. Renvoie le compte (public) avec `reactivated` et `session` (la session dédiée existe encore), ou null.
+   */
+  function setAccess(sub, { role, values, name, email }) {
+    const r = read();
+    const a = r.accounts.find((x) => x.sub === sub);
+    if (!a) return null;
+    const reactivated = Boolean(a.disabled);
+    a.role = role;
+    a.values = values;
+    a.disabled = false;
+    if (name) a.name = String(name).slice(0, 120);
+    if (email) a.email = String(email).slice(0, 200);
+    write(r);
+    return { ...publicAccount(a), reactivated, session: Boolean(a.token) };
+  }
+
+  /**
+   * Retire l'accès du compte relié à `sub` : désactivé (refusé partout dans Soundy) et sa session Emby dédiée
+   * fermée, ce qui ferme aussi les sessions ouvertes par le Board dans les navigateurs. Le lien reste, pour qu'un
+   * PUT du Board le réactive. Renvoie le compte (public), ou null si aucun compte n'est relié à `sub`.
+   */
+  async function disable(sub) {
+    const r = read();
+    const a = r.accounts.find((x) => x.sub === sub);
+    if (!a) return null;
+    const token = a.token;
+    a.disabled = true;
+    a.token = '';
+    write(r);
+    if (token) await emby.logout(token).catch(() => {});
+    return publicAccount(a);
+  }
+
+  /** Revendication `kosmy_board_access` de l'ID token, revérifiée avec les règles de Soundy (null si absente ou refusée). */
+  function accessClaim(claims, current) {
+    const c = claims.kosmy_board_access;
+    if (!rules || !c || typeof c !== 'object' || Array.isArray(c)) return null;
+    try {
+      return rules.clean({ role: c.role, values: c.values }, current);
+    } catch (e) {
+      console.warn(`[kosmy-board] revendication kosmy_board_access refusée (${e.message}) : ignorée.`);
+      return null;
+    }
+  }
 
   /** Délie un compte (par `sub`) et ferme sa session dédiée dans Emby. Renvoie le compte retiré, ou null. */
   async function unlink(sub) {
@@ -432,7 +531,12 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
         const replaced = fresh.accounts.filter((a) => a.sub === claims.sub || a.embyUserId === f.link.embyUserId);
         fresh.accounts = fresh.accounts.filter((a) => !replaced.includes(a));
         if (fresh.accounts.length >= MAX_ACCOUNTS) throw new OidcError('full', 'Trop de comptes reliés.');
-        const account = { sub: claims.sub, name, email, ...f.link, linkedAt: date, lastLogin: '' };
+        // L'accès géré par le Board suit le compte du Board : gardé d'un lien à l'autre, ou donné par l'ID token.
+        const prev = replaced.find((a) => a.sub === claims.sub);
+        const kept = prev?.role ? { role: prev.role, values: prev.values, disabled: Boolean(prev.disabled) } : {};
+        const given = accessClaim(claims, prev?.values);
+        const access = given ? { ...given, disabled: false } : kept;
+        const account = { sub: claims.sub, name, email, ...f.link, ...access, linkedAt: date, lastLogin: '' };
         fresh.accounts.push(account);
         write(fresh);
         f.link = null; // gardée : ne pas la fermer
@@ -442,8 +546,21 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
 
       const fresh = read();
       const account = fresh.accounts.find((a) => a.sub === claims.sub);
+      // Le compte Emby ne peut pas être créé par Soundy (il faut son mot de passe pour ouvrir une session) :
+      // sans lien, même avec `kosmy_board_access`, la personne doit d'abord relier son compte dans Soundy.
       if (!account) throw new OidcError('not_linked', 'Ce compte Kosmy Board n’est relié à aucun compte Soundy.');
-      const user = await emby.check(account.token, account.embyUserId).catch(() => null);
+      // Accès donné par le Board (`kosmy_board_access`) : appliqué comme un PUT (compte réactivé), sauf s'il
+      // retirait ses droits au dernier administrateur.
+      const given = accessClaim(claims, account.values);
+      const user = account.token ? await emby.check(account.token, account.embyUserId).catch(() => null) : null;
+      if (given) {
+        const wasAdmin = !account.disabled && (account.role ? account.role === 'admin' : Boolean(user?.isAdmin));
+        if (!wasAdmin || given.role === 'admin' || (await otherAdmin(claims.sub))) {
+          Object.assign(account, given, { disabled: false });
+          write(fresh);
+        }
+      }
+      if (account.disabled) throw new OidcError('disabled_account', 'Ce compte est désactivé dans Soundy.');
       if (!user) throw new OidcError('expired', 'La session Emby reliée à ce compte n’est plus valide. Reliez-le à nouveau depuis les réglages de Soundy.');
       account.name = name;
       account.email = email;
@@ -472,7 +589,8 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
     if (!t || t.exp < now()) throw new OidcError('state', 'Connexion expirée. Recommencez depuis Kosmy Board.');
     const account = accountBySub(t.sub);
     if (!account) throw new OidcError('not_linked', 'Ce compte Kosmy Board n’est relié à aucun compte Soundy.');
-    const user = await emby.check(account.token, account.embyUserId).catch(() => null);
+    if (account.disabled) throw new OidcError('disabled_account', 'Ce compte est désactivé dans Soundy.');
+    const user = await check(account.token, account.embyUserId).catch(() => null);
     if (!user) throw new OidcError('expired', 'La session Emby reliée à ce compte n’est plus valide.');
     return {
       session: { server: account.server, userId: account.embyUserId, userName: user.name, token: account.token, isAdmin: user.isAdmin },
@@ -520,9 +638,9 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
       return { ok: false, error: 'unreachable' };
     }
     if (typeof endpoint !== 'string' || !/^https?:\/\//.test(endpoint)) return { ok: false, error: 'unsupported' };
-    // Les administrateurs d'aujourd'hui : on demande à Emby, avec la session reliée de chacun.
+    // Les administrateurs d'aujourd'hui : rôle choisi dans le Board, sinon on demande à Emby avec la session reliée.
     const checks = await Promise.all(
-      r.accounts.map((a) => emby.check(a.token, a.embyUserId).then((u) => (u?.isAdmin ? a.sub : null)).catch(() => null)),
+      r.accounts.filter((a) => !a.disabled).map((a) => check(a.token, a.embyUserId).then((u) => (u?.isAdmin ? a.sub : null)).catch(() => null)),
     );
     const to = checks.filter(Boolean);
     if (!to.length) return { ok: false, error: 'no_admin' };
@@ -573,6 +691,7 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
 
     const account = r.accounts.find((a) => a.sub === claims.sub);
     if (!account) throw new OidcError('not_linked', 'Ce compte Kosmy Board n’est relié à aucun compte Soundy.');
+    if (account.disabled) throw new OidcError('disabled_account', 'Ce compte est désactivé dans Soundy.');
     return { claims, account };
   }
 
@@ -590,5 +709,11 @@ export function createKosmyBoard({ dataDir, emby, fetchImpl = (...a) => fetch(..
     authenticateAdmin,
     notifyAdmins,
     publicAccount,
+    applyAccess,
+    valuesOf,
+    linkedAccess,
+    otherAdmin,
+    setAccess,
+    disable,
   };
 }

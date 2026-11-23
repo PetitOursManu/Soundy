@@ -86,6 +86,7 @@
 
 | Version | Changements |
 |---|---|
+| **1.8.0** | **Utilisateurs gérés par Kosmy Board** : depuis le Board, un administrateur choisit le rôle de chaque compte relié dans Soundy (administrateur ou membre, sans rien changer dans Emby) et son nombre de demandes en attente, ou lui retire l'accès à Soundy. |
 | **1.7.0** | **Notifications par Kosmy Board** : chaque nouvelle demande arrive dans la cloche du Board et sur Kosmy Mobile, pour les administrateurs Emby reliés au Board. `WEBHOOK_URL` devient facultatif. Page de connexion sur PC : bobines de la cassette mieux réparties. Lecteur : le bras de la platine se relève de nouveau en pause. |
 | **1.6.1** | Page de connexion sur PC : mise en page en deux colonnes (visuel à gauche, carte de connexion à droite), formulaire affiché directement. Demi-disques et cassette corrects en thème sombre automatique. |
 | **1.6.0** | **Kosmy Board** : « Se connecter avec Kosmy Board » (version web) après avoir relié son compte dans les Réglages, et administration de Soundy (demandes, notifications, comptes reliés) depuis le Board. |
@@ -215,7 +216,7 @@ Placez-le derrière votre reverse proxy HTTPS (Nginx Proxy Manager, Traefik, Cad
 | `WEBHOOK_TYPE` | | Force le format de notification (`discord`, `ntfy`, `gotify`, `slack`, `json`). |
 | `NOTIFY_LANG` | | Langue des notifications : `fr` (défaut) ou `en`. |
 | `EMBY_PROXY` | | `true` pour exposer Emby via `https://soundy.mondomaine.fr/emby` (voir dépannage). |
-| `MAX_PENDING` | | Nombre max de demandes en attente par utilisateur (défaut `20`). |
+| `MAX_PENDING` | | Nombre max de demandes en attente par utilisateur (défaut `20`, réglable compte par compte depuis [Kosmy Board](#-kosmy-board)). |
 
 ### Sans Docker
 
@@ -232,7 +233,7 @@ EMBY_URL=http://localhost:8096 node server/index.js
 ## 🧩 Kosmy Board
 
 Soundy peut s'ouvrir depuis [Kosmy Board](https://github.com/PetitOursManu/Kosmy-Board) sans retaper de mot de passe,
-et un administrateur Emby peut l'administrer **depuis le Board** (demandes, notifications, comptes reliés).
+et un administrateur peut l'administrer **depuis le Board** (demandes, notifications, comptes reliés) et y régler l'accès de chacun.
 Version web seulement (pas l'application Android).
 
 **1. Régler la connexion** (une fois, par un administrateur Emby) :
@@ -256,9 +257,30 @@ puis confirmez votre mot de passe Emby. Ensuite, **Ouvrir** dans le Board vous c
 - **Délier** (dans les Réglages, ou depuis l'admin du Board pour un autre compte) ferme cette session dans Emby.
   La fermer dans Emby (*Tableau de bord → Appareils*) coupe aussi le lien : il suffit de relier à nouveau.
 - Se déconnecter de Soundy après une connexion par le Board ne ferme pas la session dédiée : le lien reste actif.
-- **Admin dans le Board** : réservé aux comptes reliés qui sont **administrateurs dans Emby** (vérifié auprès d'Emby à chaque fois).
+- **Admin dans le Board** : réservé aux comptes reliés **administrateurs de Soundy** : rôle choisi dans le Board (voir
+  ci-dessous), sinon administrateur dans Emby (vérifié auprès d'Emby à chaque fois).
 - Réglages et comptes reliés : `DATA_DIR/kosmy-board.json` (droits 600). Le secret client n'est jamais renvoyé à l'appli.
 - Le serveur Soundy doit pouvoir joindre le Board (découverte et clés), et le serveur du Board doit pouvoir joindre Soundy.
+
+**3. Gérer les utilisateurs depuis le Board** (protocole `kosmy.board-users.v1`) : dans le Board, l'accès d'une personne
+à l'instance Soundy se règle avec un **rôle** et une **restriction** :
+
+| Dans le Board | Effet dans Soundy |
+|---|---|
+| Rôle **Administrateur** | Administre Soundy : toutes les demandes, réglages, admin dans le Board, notifications des demandes. |
+| Rôle **Membre** | Écoute et fait des demandes, sans administration (même administrateur dans Emby). |
+| **Demandes en attente au plus** | Remplace `MAX_PENDING` pour ce compte ; `0` : ne peut pas faire de demande. |
+| **Retirer l'accès** | Compte refusé partout dans Soundy (connexion par mot de passe ou par le Board, demandes, admin dans le Board) et session Emby dédiée fermée. Le Board peut le rétablir. |
+
+- Les comptes de Soundy sont ceux d'Emby, et Soundy n'a **aucun droit d'administration sur Emby** : il ne crée pas de
+  compte Emby et ne modifie rien dans Emby (le rôle ne vaut que dans Soundy). Le Board gère donc les comptes **déjà
+  reliés** ; pour une personne qui ne l'est pas encore, il affiche qu'elle doit d'abord relier son compte Emby dans
+  Soundy (étape 2). Son rôle et sa restriction s'appliquent ensuite : au lien, à sa connexion par le Board, ou avec
+  « Resynchroniser ».
+- Retirer l'accès ferme la session Emby dédiée : une fois l'accès rétabli, la personne relie à nouveau son compte pour
+  se connecter par le Board. Le compte Emby reste utilisable dans les autres applis Emby : le désactiver dans Emby
+  reste l'affaire de l'administrateur d'Emby.
+- Sans rôle choisi dans le Board, rien ne change : administrateur de Soundy = administrateur dans Emby.
 
 ---
 
@@ -275,7 +297,8 @@ Avec [Kosmy Board réglé](#-kosmy-board), rien de plus à faire : chaque nouvel
 - dans la **cloche** de Kosmy Board (page Notifications) ;
 - sur le téléphone, en **notification Android de Kosmy Mobile** (relié au même compte du Board).
 
-Seuls les comptes du Board **reliés à un administrateur Emby** la reçoivent (vérifié auprès d'Emby à chaque envoi).
+Seuls les comptes du Board **reliés à un administrateur de Soundy** la reçoivent : rôle choisi dans le Board, sinon
+administrateur dans Emby (vérifié auprès d'Emby à chaque envoi).
 Il faut donc que l'administrateur ait relié son compte : **Réglages → Kosmy Board → Relier à Kosmy Board**.
 **Réglages → Notifications des demandes → Envoyer une notification de test** vérifie que tout arrive.
 

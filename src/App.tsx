@@ -16,6 +16,7 @@ import { useSettings } from './store/settings';
 import { setNativeSystemBars } from './lib/native';
 import { toast } from './store/toast';
 import { EmbyError } from './api/emby';
+import { checkAccess } from './api/access';
 
 const AlbumPage = lazy(() => import('./pages/AlbumPage'));
 const Search = lazy(() => import('./pages/Search'));
@@ -112,6 +113,27 @@ export default function App() {
   useEffect(() => {
     void useDownloads.getState().init();
   }, []);
+
+  // Accès décidé par le serveur Soundy (Kosmy Board) : rôle à jour, ou déconnexion si l'accès est retiré.
+  const sessionToken = session?.token;
+  useEffect(() => {
+    const current = useAuth.getState().session;
+    if (!current) return;
+    let alive = true;
+    void checkAccess(useSettings.getState().requestsUrl, current).then((access) => {
+      const auth = useAuth.getState();
+      if (!alive || !access || auth.session?.token !== current.token) return;
+      if (access === 'disabled') {
+        toast(t('access.disabled'), 'error');
+        auth.logout();
+      } else if (access.isAdmin !== current.isAdmin) {
+        auth.setSession({ ...current, isAdmin: access.isAdmin });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [sessionToken]);
 
   // Session expirée → retour à l'écran de connexion
   useEffect(() => {

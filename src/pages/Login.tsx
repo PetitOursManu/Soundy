@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { login } from '../api/emby';
+import { checkAccess } from '../api/access';
+import { EmbyClient, login } from '../api/emby';
 import { boardEnabled, LOGIN_URL } from '../api/kosmyBoard';
 import { onBackButton } from '../lib/backButton';
 import { useMediaQuery } from '../lib/hooks';
@@ -60,6 +61,13 @@ export default function Login() {
     setLoading(true);
     try {
       const session = await login(server, user.trim(), password);
+      // Accès retiré par un administrateur (Kosmy Board) : on referme la session tout de suite.
+      const access = await checkAccess(useSettings.getState().requestsUrl, session);
+      if (access === 'disabled') {
+        void new EmbyClient(session).logout();
+        return setError(t('access.disabled'));
+      }
+      if (access) session.isAdmin = access.isAdmin;
       localStorage.setItem(LAST_SERVER, session.server);
       setSession(session);
     } catch (err) {

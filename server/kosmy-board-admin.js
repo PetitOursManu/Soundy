@@ -17,7 +17,7 @@ export const PROTOCOL = 'kosmy.board-admin.v1';
 export const ADMIN_PATH = '/api/kosmy-board/admin';
 const MAX_ROWS = 500;
 
-const TEXTS = {
+export const TEXTS = {
   overview: ['Vue d’ensemble', 'Overview'],
   requests: ['Demandes', 'Requests'],
   notifications: ['Notifications', 'Notifications'],
@@ -125,19 +125,65 @@ const TEXTS = {
     'La session Emby reliée à votre compte n’est plus valide : reliez-le à nouveau dans les réglages de Soundy.',
     'The Emby session linked to your account is no longer valid: link it again in Soundy’s settings.',
   ],
-  forbidden: ['Votre compte Emby n’est pas administrateur.', 'Your Emby account is not an administrator.'],
+  forbidden: ['Votre compte n’est pas administrateur de Soundy.', 'Your account is not a Soundy administrator.'],
+  accountDisabled: ['Votre accès à Soundy a été retiré.', 'Your access to Soundy has been removed.'],
+  colAccess: ['Accès', 'Access'],
+  accessAdmin: ['Administrateur (Board)', 'Administrator (Board)'],
+  accessMember: ['Membre (Board)', 'Member (Board)'],
+  accessEmby: ['Selon Emby', 'From Emby'],
+  accessOff: ['Retiré', 'Removed'],
+  notDisabled: [
+    'L’accès de ce compte a été retiré dans Kosmy Board : le délier lèverait ce blocage. Rétablissez d’abord son accès depuis le Board.',
+    'This account’s access was removed in Kosmy Board: unlinking it would lift that block. Restore its access from the Board first.',
+  ],
   unreachableBoard: ['Soundy n’arrive pas à joindre Kosmy Board pour vérifier le jeton.', 'Soundy cannot reach Kosmy Board to check the token.'],
   embyUnreachable: ['Emby est injoignable depuis le serveur Soundy.', 'Emby is unreachable from the Soundy server.'],
 };
 
 const SERVICE_NAMES = { discord: 'Discord', slack: 'Slack / Mattermost', gotify: 'Gotify', ntfy: 'ntfy', json: 'Webhook' };
 
-class AdminError extends Error {
+export class AdminError extends Error {
   constructor(status, error, message) {
     super(message);
     this.status = status;
     this.error = error;
   }
+}
+
+/** Textes dans la langue de la requête (Accept-Language : en, sinon français). */
+export function textsFor(req, table = TEXTS) {
+  const en = /^en/i.test(req.get('Accept-Language') || '');
+  return (key, vars = {}) => table[key][en ? 1 : 0].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+}
+
+/**
+ * Authentifie une requête du Board (admin et utilisateurs) : jeton kb-admin+jwt pour cette méthode et ce chemin,
+ * `sub` relié à un compte actif, puis compte administrateur de Soundy (rôle choisi dans le Board, sinon Emby).
+ * `checkUser(token, userId)` vérifie la session auprès d'Emby et applique l'accès du Board.
+ * Renvoie { claims, account, user } ou lève une AdminError (textes de TEXTS).
+ */
+export async function authenticateBoard({ kb, checkUser }, req, t) {
+  let ctx;
+  try {
+    ctx = await kb.authenticateAdmin({ authorization: req.get('Authorization'), method: req.method, path: req.path.replace(/\/+$/, '') });
+  } catch (e) {
+    if (!(e instanceof OidcError)) throw e;
+    if (e.code === 'not_linked') throw new AdminError(403, 'not_linked', t('notLinked'));
+    if (e.code === 'disabled_account') throw new AdminError(403, 'forbidden', t('accountDisabled'));
+    if (e.code === 'disabled') throw new AdminError(401, 'invalid_token', t('disabled'));
+    if (e.code === 'network' || e.code === 'discovery') throw new AdminError(503, 'board_unreachable', t('unreachableBoard'));
+    throw new AdminError(401, 'invalid_token', `${t('invalidToken')} (${e.message})`);
+  }
+  let user;
+  try {
+    user = await checkUser(ctx.account.token, ctx.account.embyUserId);
+  } catch (e) {
+    if (e?.key === 'invalidSession') throw new AdminError(403, 'not_linked', t('expired'));
+    throw new AdminError(503, 'emby_unreachable', t('embyUnreachable'));
+  }
+  if (user.disabled) throw new AdminError(403, 'forbidden', t('accountDisabled'));
+  if (!user.isAdmin) throw new AdminError(403, 'forbidden', t('forbidden'));
+  return { ...ctx, user };
 }
 
 /**
@@ -148,10 +194,7 @@ class AdminError extends Error {
  *                         notifyAdmins(title, text) → { board?, webhook? } }
  */
 export function createKosmyBoardAdmin({ kb, deps }) {
-  function texts(req) {
-    const en = /^en/i.test(req.get('Accept-Language') || '');
-    return (key, vars = {}) => TEXTS[key][en ? 1 : 0].replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
-  }
+  const texts = (req) => textsFor(req);
 
   const dateOf = (iso, lang) => {
     if (!iso) return '';
@@ -279,6 +322,7 @@ export function createKosmyBoardAdmin({ kb, deps }) {
           columns: [
             { key: 'board', label: t('colBoard') },
             { key: 'emby', label: t('colEmby') },
+            { key: 'access', label: t('colAccess') },
             { key: 'linked', label: t('colLinked') },
             { key: 'last', label: t('colLast') },
           ],
@@ -287,10 +331,16 @@ export function createKosmyBoardAdmin({ kb, deps }) {
             cells: {
               board: [a.name, a.email && a.email !== a.name ? a.email : ''].filter(Boolean).join(' · ') || a.sub,
               emby: a.embyUserName,
+              access: a.disabled
+                ? { text: t('accessOff'), tone: 'danger' }
+                : a.role
+                  ? { text: t(a.role === 'admin' ? 'accessAdmin' : 'accessMember'), tone: a.role === 'admin' ? 'success' : 'muted' }
+                  : { text: t('accessEmby'), tone: 'muted' },
               linked: dateOf(a.linkedAt, lang),
               last: a.lastLogin ? dateOf(a.lastLogin, lang) : { text: t('never'), tone: 'muted' },
             },
-            actions: a.sub === me ? [] : ['unlink'],
+            // Délier un compte dont l'accès est retiré lèverait ce blocage : pas proposé.
+            actions: a.sub === me || a.disabled ? [] : ['unlink'],
           })),
           rowActions: [{ id: 'unlink', label: t('unlink'), danger: true, confirm: t('unlinkConfirm') }],
           empty: t('noAccounts'),
@@ -348,6 +398,7 @@ export function createKosmyBoardAdmin({ kb, deps }) {
 
     if (id === 'accounts' && action === 'unlink') {
       if (row === ctx.claims.sub) throw new AdminError(409, 'conflict', t('notSelf'));
+      if (kb.accounts().find((a) => a.sub === row)?.disabled) throw new AdminError(409, 'conflict', t('notDisabled'));
       const removed = await kb.unlink(row);
       if (!removed) throw new AdminError(404, 'not_found', t('unknownRow'));
       return { message: t('unlinked') };
@@ -359,27 +410,7 @@ export function createKosmyBoardAdmin({ kb, deps }) {
 
   /* ---------- authentification ---------- */
 
-  async function authenticate(req, t) {
-    let ctx;
-    try {
-      ctx = await kb.authenticateAdmin({ authorization: req.get('Authorization'), method: req.method, path: req.path.replace(/\/+$/, '') });
-    } catch (e) {
-      if (!(e instanceof OidcError)) throw e;
-      if (e.code === 'not_linked') throw new AdminError(403, 'not_linked', t('notLinked'));
-      if (e.code === 'disabled') throw new AdminError(401, 'invalid_token', t('disabled'));
-      if (e.code === 'network' || e.code === 'discovery') throw new AdminError(503, 'board_unreachable', t('unreachableBoard'));
-      throw new AdminError(401, 'invalid_token', `${t('invalidToken')} (${e.message})`);
-    }
-    let user;
-    try {
-      user = await deps.checkEmby(ctx.account.token, ctx.account.embyUserId);
-    } catch (e) {
-      if (e?.key === 'invalidSession') throw new AdminError(403, 'not_linked', t('expired'));
-      throw new AdminError(503, 'emby_unreachable', t('embyUnreachable'));
-    }
-    if (!user.isAdmin) throw new AdminError(403, 'forbidden', t('forbidden'));
-    return { ...ctx, user };
-  }
+  const authenticate = (req, t) => authenticateBoard({ kb, checkUser: deps.checkEmby }, req, t);
 
   /** Middleware Express pour /api/kosmy-board/admin[/{section}]. */
   return async function handler(req, res, next) {

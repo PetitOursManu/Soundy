@@ -74,6 +74,7 @@ export const boardApi = {
 const ERRORS: Record<string, Key> = {
   not_linked: 'kb.error.notLinked',
   expired: 'kb.error.expired',
+  disabled_account: 'access.disabled',
   denied: 'kb.error.denied',
   state: 'kb.error.state',
   issuer: 'kb.error.issuer',
